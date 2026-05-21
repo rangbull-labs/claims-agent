@@ -18,7 +18,7 @@ The design doc names which safeguard layers are shipped vs. deferred. Do not pre
 
 - **Backend**: Node.js 20 + TypeScript on AWS Lambda
 - **API surface**: Lambda Function URL (not API Gateway), CORS enabled
-- **Agent framework**: LangChain.js v0.3 with `@langchain/aws` for Bedrock
+- **Agent framework**: LangChain.js v1 with `@langchain/aws` for Bedrock
 - **Primary model**: Claude Haiku 4.5 (`anthropic.claude-haiku-4-5-20251001-v1:0`)
 - **Eval comparison model**: Claude Sonnet 4 (`anthropic.claude-sonnet-4-20250514-v1:0`)
 - **Embeddings**: Amazon Titan v2 (`amazon.titan-embed-text-v2:0`)

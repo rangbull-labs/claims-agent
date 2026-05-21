@@ -1,1 +1,29 @@
 KICKOFF.md
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Eval results
+backend/eval/results/
+
+# Deployment
+.vercel
+backend/lambda.zip
+backend/bundle/
