@@ -1,0 +1,62 @@
+[
+  {
+    "code": "SYN-DENY-001",
+    "category": "Coverage",
+    "description": "Service not covered under member's plan.",
+    "appealable": true
+  },
+  {
+    "code": "SYN-DENY-002",
+    "category": "Coverage",
+    "description": "Annual benefit maximum reached for this service category.",
+    "appealable": false
+  },
+  {
+    "code": "SYN-DENY-003",
+    "category": "Documentation",
+    "description": "Required medical records not submitted within the 45-day window.",
+    "appealable": true
+  },
+  {
+    "code": "SYN-DENY-004",
+    "category": "Documentation",
+    "description": "Missing or invalid diagnosis code on claim submission.",
+    "appealable": true
+  },
+  {
+    "code": "SYN-DENY-005",
+    "category": "Network",
+    "description": "Provider not in-network for member's plan.",
+    "appealable": false
+  },
+  {
+    "code": "SYN-DENY-006",
+    "category": "Network",
+    "description": "Out-of-network referral not obtained prior to service.",
+    "appealable": false
+  },
+  {
+    "code": "SYN-DENY-007",
+    "category": "Authorization",
+    "description": "Prior authorization not obtained before service was rendered.",
+    "appealable": true
+  },
+  {
+    "code": "SYN-DENY-008",
+    "category": "Authorization",
+    "description": "Authorization expired before date of service.",
+    "appealable": true
+  },
+  {
+    "code": "SYN-DENY-009",
+    "category": "Coordination of Benefits",
+    "description": "Other primary insurance coverage indicated; coordinate with primary payer.",
+    "appealable": true
+  },
+  {
+    "code": "SYN-DENY-010",
+    "category": "Coordination of Benefits",
+    "description": "Primary payer Explanation of Benefits required to process this claim.",
+    "appealable": true
+  }
+]

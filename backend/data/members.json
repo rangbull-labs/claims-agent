@@ -1,0 +1,162 @@
+[
+  {
+    "memberId": "M-001",
+    "planType": "PPO Gold",
+    "firstName": "Member",
+    "lastName": "Alpha",
+    "dateOfBirth": "1973-04-10",
+    "planEffectiveDate": "2024-07-05"
+  },
+  {
+    "memberId": "M-002",
+    "planType": "PPO Gold",
+    "firstName": "Member",
+    "lastName": "Bravo",
+    "dateOfBirth": "1982-05-04",
+    "planEffectiveDate": "2024-03-04"
+  },
+  {
+    "memberId": "M-003",
+    "planType": "PPO Gold",
+    "firstName": "Member",
+    "lastName": "Charlie",
+    "dateOfBirth": "1972-07-10",
+    "planEffectiveDate": "2024-06-03"
+  },
+  {
+    "memberId": "M-004",
+    "planType": "PPO Gold",
+    "firstName": "Member",
+    "lastName": "Delta",
+    "dateOfBirth": "1969-02-26",
+    "planEffectiveDate": "2024-10-23"
+  },
+  {
+    "memberId": "M-005",
+    "planType": "PPO Gold",
+    "firstName": "Member",
+    "lastName": "Echo",
+    "dateOfBirth": "1955-09-14",
+    "planEffectiveDate": "2025-01-02"
+  },
+  {
+    "memberId": "M-006",
+    "planType": "PPO Gold",
+    "firstName": "Member",
+    "lastName": "Foxtrot",
+    "dateOfBirth": "1994-09-09",
+    "planEffectiveDate": "2024-07-18"
+  },
+  {
+    "memberId": "M-007",
+    "planType": "PPO Gold",
+    "firstName": "Member",
+    "lastName": "Golf",
+    "dateOfBirth": "1957-04-01",
+    "planEffectiveDate": "2025-07-11"
+  },
+  {
+    "memberId": "M-008",
+    "planType": "PPO Silver",
+    "firstName": "Member",
+    "lastName": "Hotel",
+    "dateOfBirth": "1972-02-24",
+    "planEffectiveDate": "2025-11-04"
+  },
+  {
+    "memberId": "M-009",
+    "planType": "PPO Silver",
+    "firstName": "Member",
+    "lastName": "India",
+    "dateOfBirth": "1962-05-07",
+    "planEffectiveDate": "2025-12-27"
+  },
+  {
+    "memberId": "M-010",
+    "planType": "PPO Silver",
+    "firstName": "Member",
+    "lastName": "Juliet",
+    "dateOfBirth": "1985-02-03",
+    "planEffectiveDate": "2025-12-01"
+  },
+  {
+    "memberId": "M-011",
+    "planType": "PPO Silver",
+    "firstName": "Member",
+    "lastName": "Kilo",
+    "dateOfBirth": "1959-07-04",
+    "planEffectiveDate": "2025-06-13"
+  },
+  {
+    "memberId": "M-012",
+    "planType": "PPO Silver",
+    "firstName": "Member",
+    "lastName": "Lima",
+    "dateOfBirth": "1969-01-13",
+    "planEffectiveDate": "2025-07-22"
+  },
+  {
+    "memberId": "M-013",
+    "planType": "PPO Silver",
+    "firstName": "Member",
+    "lastName": "Mike",
+    "dateOfBirth": "1980-02-23",
+    "planEffectiveDate": "2025-03-24"
+  },
+  {
+    "memberId": "M-014",
+    "planType": "PPO Silver",
+    "firstName": "Member",
+    "lastName": "November",
+    "dateOfBirth": "1991-11-02",
+    "planEffectiveDate": "2024-02-19"
+  },
+  {
+    "memberId": "M-015",
+    "planType": "HMO Bronze",
+    "firstName": "Member",
+    "lastName": "Oscar",
+    "dateOfBirth": "1975-12-27",
+    "planEffectiveDate": "2024-06-13"
+  },
+  {
+    "memberId": "M-016",
+    "planType": "HMO Bronze",
+    "firstName": "Member",
+    "lastName": "Papa",
+    "dateOfBirth": "1993-07-06",
+    "planEffectiveDate": "2024-05-14"
+  },
+  {
+    "memberId": "M-017",
+    "planType": "HMO Bronze",
+    "firstName": "Member",
+    "lastName": "Quebec",
+    "dateOfBirth": "1982-04-12",
+    "planEffectiveDate": "2025-08-24"
+  },
+  {
+    "memberId": "M-018",
+    "planType": "HMO Bronze",
+    "firstName": "Member",
+    "lastName": "Romeo",
+    "dateOfBirth": "1965-05-18",
+    "planEffectiveDate": "2025-08-17"
+  },
+  {
+    "memberId": "M-019",
+    "planType": "HMO Bronze",
+    "firstName": "Member",
+    "lastName": "Sierra",
+    "dateOfBirth": "1967-12-09",
+    "planEffectiveDate": "2025-12-21"
+  },
+  {
+    "memberId": "M-020",
+    "planType": "HMO Bronze",
+    "firstName": "Member",
+    "lastName": "Tango",
+    "dateOfBirth": "1993-06-02",
+    "planEffectiveDate": "2024-06-02"
+  }
+]
