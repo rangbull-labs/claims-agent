@@ -1,15 +1,31 @@
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import dotenv from "dotenv";
 import { z } from "zod";
 
+/**
+ * Walks up from `startDir` looking for a `.env` file. Returns the
+ * absolute path if found, or `null`. CJS-safe (no `import.meta.url`) so
+ * this module bundles cleanly for Lambda's CJS runtime; the function is
+ * only invoked outside production anyway.
+ */
+function findEnvFile(startDir: string): string | null {
+  let dir = startDir;
+  while (true) {
+    const candidate = resolve(dir, ".env");
+    if (existsSync(candidate)) return candidate;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
 if (process.env.NODE_ENV !== "production") {
-  // Resolve .env relative to this file, not process.cwd(), so the script
-  // works regardless of which directory pnpm invokes it from.
-  // backend/src/config.ts → backend/ → repo root.
-  const here = dirname(fileURLToPath(import.meta.url));
-  dotenv.config({ path: resolve(here, "..", "..", ".env") });
+  const envPath = findEnvFile(process.cwd());
+  if (envPath) {
+    dotenv.config({ path: envPath });
+  }
 }
 
 const envSchema = z.object({

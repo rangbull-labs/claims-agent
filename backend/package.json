@@ -11,7 +11,8 @@
     "seed-data": "tsx scripts/seedData.ts",
     "ingest-kb": "tsx scripts/ingestKb.ts",
     "verify:retrievePolicy": "tsx scripts/verifyRetrievePolicy.ts",
-    "test": "tsx --test src/tools/lookupClaim.test.ts"
+    "test": "tsx --test src/tools/lookupClaim.test.ts src/safeguards/escalationGuard.test.ts",
+    "test:integration": "tsx tests/integration/runIntegrationTests.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent": "^3.864.0",

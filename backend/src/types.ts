@@ -62,4 +62,6 @@ export interface AgentTrace {
   draftResponse: string | null;
   disposition: TraceDisposition;
   model: string;
+  /** Populated when `disposition === "escalated"`; identifies which escalation rule fired. */
+  escalationReason?: string;
 }
