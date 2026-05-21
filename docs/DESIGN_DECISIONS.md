@@ -137,6 +137,8 @@ A few things this project deliberately is not, so the boundary between what's bu
 
 **It does not include the appeals workflow.** Appeals carry regulatory weight that exceeds what a synthetic-data demo should claim to handle. Out of scope.
 
+**It does not enable `exactOptionalPropertyTypes` in TypeScript.** The setting was removed from `tsconfig.base.json` during the tools build (Prompt 5) because Zod v3 and LangChain.js v1's tool-input schema types are not compatible with it. Re-enable when those libraries catch up.
+
 The playbook I worked through has more in it than what's shipped. The gap between the design and the implementation is the most honest thing on this page. Everything I shipped, I shipped on purpose. Everything I didn't ship, I didn't ship on purpose. Both lists are explicit.
 
 ---

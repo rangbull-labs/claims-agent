@@ -7,7 +7,11 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "generate-data": "tsx scripts/generateData.ts"
+    "generate-data": "tsx scripts/generateData.ts",
+    "seed-data": "tsx scripts/seedData.ts",
+    "ingest-kb": "tsx scripts/ingestKb.ts",
+    "verify:retrievePolicy": "tsx scripts/verifyRetrievePolicy.ts",
+    "test": "tsx --test src/tools/lookupClaim.test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent": "^3.864.0",

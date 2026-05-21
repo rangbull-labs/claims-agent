@@ -153,7 +153,7 @@ Done when:
 
 **AWS prerequisites:**
 - DynamoDB tables `claims-agent-Members`, `claims-agent-Claims`, `claims-agent-AgentTraces` created per AWS_SETUP.md
-- S3 bucket `claims-agent-policy-docs-<your-suffix>` created
+- S3 bucket `claims-agent-policy-docs-rb2026-464817648943-us-east-1-an` created
 - Bedrock KB created and pointed at the S3 bucket
 - IAM user `claims-agent-dev` has read/write on these
 - `.env` populated with all values

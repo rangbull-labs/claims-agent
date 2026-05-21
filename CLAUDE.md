@@ -45,7 +45,7 @@ The design doc names which safeguard layers are shipped vs. deferred. Do not pre
 
 - **TypeScript everywhere.** No `.js` files in `src/` directories. Test files: `*.test.ts` colocated with the code they test (not in a separate `tests/` tree).
 - **`tsconfig.base.json` at repo root**, extended by `backend/tsconfig.json` and `frontend/tsconfig.json`. Don't duplicate compiler options.
-- **Strict mode TypeScript.** `strict: true` in tsconfig. No `any` without a comment explaining why.
+- **Strict mode TypeScript.** `strict: true` in tsconfig. No `any` without a comment explaining why. `exactOptionalPropertyTypes` was removed from `tsconfig.base.json` during Prompt 5 due to incompatibility with Zod/LangChain.js tool input schemas. Re-enable when those libraries support it.
 - **No default exports.** Named exports only. Easier to refactor and grep.
 - **Tool implementations live in `backend/src/tools/`.** One file per tool. Each tool exports a `createXxxTool(memberId: string)` factory that returns a LangChain `DynamicStructuredTool`. The `memberId` is captured in the closure — never accepted as a tool argument.
 - **AWS SDK clients are constructed once in `backend/src/aws/`.** Do not construct clients inside request handlers.

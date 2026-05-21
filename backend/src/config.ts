@@ -1,8 +1,15 @@
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import dotenv from "dotenv";
 import { z } from "zod";
 
 if (process.env.NODE_ENV !== "production") {
-  dotenv.config();
+  // Resolve .env relative to this file, not process.cwd(), so the script
+  // works regardless of which directory pnpm invokes it from.
+  // backend/src/config.ts → backend/ → repo root.
+  const here = dirname(fileURLToPath(import.meta.url));
+  dotenv.config({ path: resolve(here, "..", "..", ".env") });
 }
 
 const envSchema = z.object({
@@ -11,6 +18,7 @@ const envSchema = z.object({
   BEDROCK_EVAL_MODEL_ID: z.string().min(1, "BEDROCK_EVAL_MODEL_ID must be set"),
   BEDROCK_EMBEDDING_MODEL_ID: z.string().min(1, "BEDROCK_EMBEDDING_MODEL_ID must be set"),
   KNOWLEDGE_BASE_ID: z.string().min(1, "KNOWLEDGE_BASE_ID must be set"),
+  KB_DATA_SOURCE_ID: z.string().min(1, "KB_DATA_SOURCE_ID must be set"),
   PINECONE_API_KEY: z.string().optional(),
   DYNAMODB_MEMBERS_TABLE: z.string().min(1, "DYNAMODB_MEMBERS_TABLE must be set"),
   DYNAMODB_CLAIMS_TABLE: z.string().min(1, "DYNAMODB_CLAIMS_TABLE must be set"),
@@ -35,6 +43,7 @@ export const BEDROCK_MODEL_ID = env.BEDROCK_MODEL_ID;
 export const BEDROCK_EVAL_MODEL_ID = env.BEDROCK_EVAL_MODEL_ID;
 export const BEDROCK_EMBEDDING_MODEL_ID = env.BEDROCK_EMBEDDING_MODEL_ID;
 export const KNOWLEDGE_BASE_ID = env.KNOWLEDGE_BASE_ID;
+export const KB_DATA_SOURCE_ID = env.KB_DATA_SOURCE_ID;
 export const PINECONE_API_KEY = env.PINECONE_API_KEY;
 export const DYNAMODB_MEMBERS_TABLE = env.DYNAMODB_MEMBERS_TABLE;
 export const DYNAMODB_CLAIMS_TABLE = env.DYNAMODB_CLAIMS_TABLE;

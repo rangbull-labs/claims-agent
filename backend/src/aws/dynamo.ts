@@ -67,6 +67,29 @@ export async function getClaim(claimId: string, memberId: string): Promise<Claim
 }
 
 /**
+ * Looks up a claim by `claimId` alone, without scoping to a member. This
+ * is **only** used by the member-scoping middleware to detect attempted
+ * cross-member access: if the returned claim's `memberId` does not match
+ * the agent's bound member, the request is logged as a scope violation
+ * and an empty result is returned to the caller.
+ *
+ * Implemented as a full table `Scan` with a filter expression. Acceptable
+ * for the MVP's ~50 synthetic claims; a production version would back
+ * this with a GSI on `claimId`.
+ */
+export async function findClaimByIdUnscoped(claimId: string): Promise<Claim | null> {
+  const result = await getDocClient().send(
+    new ScanCommand({
+      TableName: DYNAMODB_CLAIMS_TABLE,
+      FilterExpression: "claimId = :c",
+      ExpressionAttributeValues: { ":c": claimId },
+    }),
+  );
+  const items = (result.Items ?? []) as Claim[];
+  return items[0] ?? null;
+}
+
+/**
  * Lists every claim belonging to a single member. Uses a `Query` against the
  * `memberId` partition key — no cross-member access is possible.
  */
