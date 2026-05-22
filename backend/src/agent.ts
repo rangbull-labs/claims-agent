@@ -22,6 +22,8 @@ export interface AgentResult {
   draftResponse: string | null;
   classification: InquiryClassification | null;
   toolCallCount: number;
+  /** Tool names in invocation order — included so the frontend can render the sequence without an extra trace fetch. */
+  toolNames: string[];
   durationMs: number;
   escalationReason?: string;
 }
@@ -124,6 +126,7 @@ export async function runAgent(
       draftResponse: null,
       classification: null,
       toolCallCount: 0,
+      toolNames: [],
       durationMs: Date.now() - startedAt,
       escalationReason: reason,
     };
@@ -191,6 +194,7 @@ export async function runAgent(
     draftResponse: execution.draftResponse,
     classification: execution.classification,
     toolCallCount: execution.toolCalls.length,
+    toolNames: execution.toolCalls.map((c) => c.toolName),
     durationMs: Date.now() - startedAt,
   };
 }
