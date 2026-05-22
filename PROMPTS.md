@@ -32,7 +32,7 @@ Create these root-level files:
 - `pnpm-workspace.yaml` declaring both workspaces
 - `package.json` with name "claims-agent", private: true, no dependencies, with scripts to run common commands across workspaces (`dev:backend`, `dev:frontend`, `build`, `typecheck`)
 - `tsconfig.base.json` with strict mode, target ES2022, module NodeNext, moduleResolution NodeNext, strict: true, noUncheckedIndexedAccess: true, exactOptionalPropertyTypes: true
-- `.gitignore` covering node_modules, dist, .env, .env.local, .DS_Store, backend/eval/results/, *.log, .vercel, Lambda bundle artifacts
+- `.gitignore` covering node_modules, dist, .env, .env.local, .DS_Store, backend/eval/results/, *.log, .firebase, Lambda bundle artifacts
 - `.env.example` with placeholders for: AWS_REGION, BEDROCK_MODEL_ID, BEDROCK_EVAL_MODEL_ID, BEDROCK_EMBEDDING_MODEL_ID, KNOWLEDGE_BASE_ID, PINECONE_API_KEY (not used directly but documented), DYNAMODB_MEMBERS_TABLE, DYNAMODB_CLAIMS_TABLE, DYNAMODB_TRACES_TABLE, POLICY_DOCS_BUCKET, FRONTEND_ORIGIN
 
 Initialize `backend/` workspace:
@@ -341,6 +341,8 @@ Create `frontend/src/lib/api.ts`:
 - Functions: `listMembers()`, `sendInquiry(memberId, inquiry)`, `listTraces()`
 - Typed responses; duplicate the shared types in `frontend/src/types.ts` (we don't have a shared package — keep it simple)
 
+Note on `VITE_LAMBDA_URL`: Vite resolves `import.meta.env.*` at build time, not runtime. The same `frontend/.env.local` value is used for both `pnpm dev` and `pnpm build` — and the bundle produced by `pnpm build` carries the resolved URL baked in. When Prompt 8 deploys to Firebase Hosting, the build is uploaded as-is; there is no Firebase-side env var to configure. The implication: changing `VITE_LAMBDA_URL` requires a rebuild + redeploy, not a hosting-side variable update.
+
 Create `frontend/src/components/SyntheticDataBanner.tsx`:
 - A small, persistent banner at the top of every page
 - Amber background, dark text
@@ -384,21 +386,28 @@ Done when:
 
 ## Day 3 (Saturday) — Deploy frontend + polish
 
-### ☐ Prompt 8 — Vercel deploy + frontend polish
+### ☐ Prompt 8 — Firebase Hosting deploy + frontend polish
 
 **AWS prerequisites:** None new.
+
+**Firebase prerequisites (one-time, already completed manually outside this prompt):**
+- A second Hosting site `claims-agent-demo` exists under the `rangbull-labs-portfolio` Firebase project.
+- Custom domain `claims-agent.rangbull-labs.com` is attached to that Hosting site and the CNAME is live at the DNS provider.
 
 ```
 Read CLAUDE.md.
 
-Deploy the frontend to Vercel:
-- Create `frontend/vercel.json` configuring it as a Vite SPA with SPA rewrites (all routes → index.html)
-- The Vercel project's environment variable VITE_LAMBDA_URL needs to be set to the production Lambda URL
-- Document the deploy commands in frontend/README.md: `cd frontend && vercel --prod`
+Deploy the frontend to Firebase Hosting:
+- Create `frontend/firebase.json` configuring it as a Vite SPA. Required fields:
+  - `"hosting"` block with `"target": "claims-agent-demo"`, `"public": "dist"`, an `"ignore"` list for the usual dotfiles, and a SPA rewrite mapping `**` → `/index.html`.
+- The `VITE_LAMBDA_URL` value is baked into the build at build time (Vite resolves `import.meta.env` during `vite build`, not at runtime). The same `frontend/.env.local` that local dev uses is what produces the production bundle — there is no Firebase-side env var to configure.
+- One-time setup from `frontend/`: `firebase init hosting` (selecting the existing `rangbull-labs-portfolio` project — do NOT create a new project, do NOT overwrite `firebase.json` if it already exists), then `firebase target:apply hosting claims-agent-demo claims-agent-demo`.
+- Deploy command (documented in `frontend/README.md`): `pnpm build && firebase deploy --only hosting:claims-agent-demo`. The `--only hosting:claims-agent-demo` target flag is load-bearing — without it, a `firebase deploy` would walk the project's hosting sites and could overwrite the portfolio site.
 
 Update the Lambda CORS configuration:
-- The deploy.sh script currently uses `*` for CORS. Now set it more tightly: read FRONTEND_ORIGIN from Lambda env vars, allow that origin plus localhost:5173 for dev.
-- Document in CLAUDE.md that the FRONTEND_ORIGIN Lambda env var must be set after Vercel deploy.
+- The deploy.sh script currently uses `*` for CORS. Now set it more tightly: read FRONTEND_ORIGIN from Lambda env vars (`https://claims-agent.rangbull-labs.com`), and also accept `http://localhost:5173` so local dev can hit the prod Lambda.
+- Update the Lambda env var `FRONTEND_ORIGIN=https://claims-agent.rangbull-labs.com` (the custom subdomain, NOT the default `.web.app` URL — the custom domain is the canonical public URL).
+- The dev-vs-prod dual-origin pattern is documented in CLAUDE.md "Deployment notes".
 
 Frontend polish:
 - Add a loading skeleton to the Chat page during the agent request
@@ -408,14 +417,15 @@ Frontend polish:
 - Add a footer with: link to the GitHub repo (placeholder URL for now), link to docs/DESIGN_DECISIONS.md (will be a GitHub blob URL once published)
 
 Done when:
-- `vercel --prod` deploys successfully
-- The Vercel URL loads and works end-to-end against the prod Lambda
+- `firebase deploy --only hosting:claims-agent-demo` succeeds
+- `https://claims-agent.rangbull-labs.com` loads and works end-to-end against the prod Lambda
+- The default `claims-agent-demo.web.app` URL is reachable as a fallback
 - The confidence-band histogram renders
 - Example prompts are clickable and pre-fill the input
 - Loading states feel responsive
 ```
 
-**Done when:** Frontend is live at a public Vercel URL. Demo is shareable.
+**Done when:** Frontend is live at `https://claims-agent.rangbull-labs.com`. Demo is shareable.
 
 ---
 
@@ -494,9 +504,9 @@ Use:
 - date: '2026-05'
 - cover_image: '/covers/claims-agent.png' (will be created separately)
 - architecture_diagram: 'claims_agent' (new registry key)
-- tech_stack: include all real components used (Node.js 20, TypeScript, AWS Lambda, Bedrock, Claude Haiku 4.5, LangChain.js, Pinecone, DynamoDB, React, Vite, Tailwind, Vercel)
+- tech_stack: include all real components used (Node.js 20, TypeScript, AWS Lambda, Bedrock, Claude Haiku 4.5, LangChain.js, Pinecone, DynamoDB, React, Vite, Tailwind, Firebase Hosting)
 - links array including:
-  - Live demo (Vercel URL placeholder)
+  - Live demo: `https://claims-agent.rangbull-labs.com`
   - GitHub repo (placeholder)
   - Design Decisions (link to docs/DESIGN_DECISIONS.md on GitHub) — label "Design decisions"
   - Loom walkthrough (placeholder URL — will be filled after recording)
@@ -546,7 +556,7 @@ You now have:
 - Portfolio-ready content
 
 **Record the Loom walkthrough (~90 seconds):**
-1. Open the Vercel URL with the Traces page visible in a second tab
+1. Open `https://claims-agent.rangbull-labs.com` with the Traces page visible in a second tab
 2. Pick a member from the dropdown
 3. Ask "Why was my last claim denied?"
 4. Wait for the response, walk through the classification, draft, tool calls

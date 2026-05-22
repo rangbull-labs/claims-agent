@@ -1,3 +1,4 @@
+# Project-specific
 KICKOFF.md
 
 # Dependencies
@@ -25,5 +26,3 @@ backend/eval/results/
 
 # Deployment
 .vercel
-backend/lambda.zip
-backend/bundle/
