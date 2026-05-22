@@ -19,12 +19,12 @@ The design doc names which safeguard layers are shipped vs. deferred. Do not pre
 - **Backend**: Node.js 20 + TypeScript on AWS Lambda
 - **API surface**: Lambda Function URL (not API Gateway), CORS enabled
 - **Agent framework**: LangChain.js v1 with `@langchain/aws` for Bedrock
-- **Primary model**: Claude Haiku 4.5 (`anthropic.claude-haiku-4-5-20251001-v1:0`)
-- **Eval comparison model**: Claude Sonnet 4 (`anthropic.claude-sonnet-4-20250514-v1:0`)
+- **Primary model**: Claude Haiku 4.5 (`us.anthropic.claude-haiku-4-5-20251001-v1:0`, cross-region inference profile)
+- **Eval comparison model**: Claude Sonnet 4 (`us.anthropic.claude-sonnet-4-20250514-v1:0`, cross-region inference profile)
 - **Embeddings**: Amazon Titan v2 (`amazon.titan-embed-text-v2:0`)
 - **Knowledge base**: Bedrock KB with Pinecone backend
 - **Data store**: DynamoDB (on-demand billing) — tables: `claims-agent-Members`, `claims-agent-Claims`, `claims-agent-AgentTraces`
-- **Frontend**: Vite + React 18 + TypeScript + Tailwind, deployed to Vercel
+- **Frontend**: Vite + React 18 + TypeScript + Tailwind, deployed to Firebase Hosting (same `rangbull-labs-portfolio` Firebase project as the portfolio site, with a separate Hosting site `claims-agent-demo`). Public URL: https://claims-agent.rangbull-labs.com
 - **Build/bundle**: esbuild for Lambda, Vite for frontend
 - **Package manager**: pnpm workspaces
 - **Region**: `us-east-1`
@@ -76,7 +76,10 @@ These are load-bearing decisions from the design doc. Read the design doc for th
 ## Deployment notes
 
 - **Lambda is deployed via `backend/deploy.sh`** — esbuild bundle → zip → `aws lambda update-function-code`. One command.
-- **Frontend is deployed to Vercel** via `vercel --prod` from the `frontend/` directory. No GitHub Actions in the MVP.
+- **The Lambda handler is configured as `index.handler`.** The build script outputs `dist/index.js` to match this convention. Do not rename one without renaming the other.
+- **Frontend is deployed to Firebase Hosting** via `firebase deploy --only hosting:claims-agent-demo` from the `frontend/` directory. No GitHub Actions in the MVP.
+- **Firebase Hosting target must be set via `firebase target:apply hosting claims-agent-demo claims-agent-demo`** in the frontend workspace before first deploy. The `firebase.json` includes the target field so deploys do not accidentally overwrite the portfolio site at the same Firebase project.
+- **CORS is dev-vs-prod-aware.** The Lambda allows the production origin `https://claims-agent.rangbull-labs.com` and additionally `http://localhost:5173` so local Vite dev can hit the deployed Lambda. `FRONTEND_ORIGIN` carries the production origin; the localhost fallback is encoded in the handler.
 - **DynamoDB tables, IAM role, Lambda function, Bedrock KB, Pinecone index are all created manually** following `docs/AWS_SETUP.md`. The deploy script only updates Lambda code.
 - **Environment variables go in `.env`** for local dev, and as Lambda environment variables in production. `.env.example` is the source of truth for what's required.
 

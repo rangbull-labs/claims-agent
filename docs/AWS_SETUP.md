@@ -27,6 +27,8 @@ Still no AWS work needed for Prompt 2 — it sets up clients but doesn't call th
    - **Titan Text Embeddings V2** (`amazon.titan-embed-text-v2:0`)
 3. If any are missing, click "Manage model access" → check the box → submit. Approval is usually instant for Anthropic models but can take up to a few hours.
 
+**Important: Claude Haiku 4.5 and Sonnet 4 require inference profile invocation for on-demand throughput.** In application code and environment variables, use the `us.`-prefixed inference profile IDs (`us.anthropic.claude-haiku-4-5-20251001-v1:0` and `us.anthropic.claude-sonnet-4-20250514-v1:0`) rather than the raw model IDs. The raw model IDs only work with provisioned throughput. This is a recent Bedrock change for newer Anthropic models.
+
 If Haiku 4.5 is not yet generally available in your region, fall back to Claude 3.5 Haiku (`anthropic.claude-3-5-haiku-20241022-v1:0`) and update `BEDROCK_MODEL_ID` accordingly.
 
 ---
@@ -56,7 +58,13 @@ This is the biggest setup step. Budget 60–90 minutes. Do this Wednesday evenin
       "Resource": [
         "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
         "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
-        "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0"
+        "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0",
+        "arn:aws:bedrock:us-east-1:<your-account-id>:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:us-east-1:<your-account-id>:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0",
+        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
+        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0"
       ]
     },
     {
@@ -110,10 +118,40 @@ This is the biggest setup step. Budget 60–90 minutes. Do this Wednesday evenin
         "lambda:GetFunction"
       ],
       "Resource": "arn:aws:lambda:us-east-1:<your-account-id>:function:claims-agent"
+    },
+    {
+      "Sid": "BedrockKBIngestion",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:StartIngestionJob",
+        "bedrock:GetIngestionJob",
+        "bedrock:ListIngestionJobs",
+        "bedrock:AssociateThirdPartyKnowledgeBase"
+      ],
+      "Resource": "arn:aws:bedrock:us-east-1:<your-account-id>:knowledge-base/<your-kb-id>"
+    },
+    {
+      "Sid": "CloudWatchLogsRead",
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogGroups",
+        "logs:DescribeLogStreams",
+        "logs:GetLogEvents",
+        "logs:FilterLogEvents",
+        "logs:StartLiveTail"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-east-1:<your-account-id>:log-group:/aws/lambda/claims-agent",
+        "arn:aws:logs:us-east-1:<your-account-id>:log-group:/aws/lambda/claims-agent:*"
+      ]
     }
   ]
 }
 ```
+
+The inference profile ARNs are required because Claude Haiku 4.5 and Sonnet 4 must be invoked via inference profiles. The cross-region foundation model ARNs (us-west-2 and us-east-2) are required because inference profiles transparently load-balance requests across the US region cluster, and Bedrock validates IAM permissions for the actual underlying region at invocation time.
+
+The CloudWatchLogsRead statement is for operator convenience (`aws logs tail`) and is NOT used by the Lambda runtime. It is over-privileging in the strictest least-privilege sense. A production hardening pass would split this into a separate `claims-agent-observer-access` policy attached to a separate operator role, rather than to the runtime user.
 
 3. **Create access key.** Save the key ID and secret somewhere safe (password manager). You will not be able to view the secret again.
 4. **Configure locally:** `aws configure --profile claims-agent-dev` and paste the credentials. Set default region to `us-east-1`.
@@ -192,8 +230,8 @@ Copy `.env.example` to `.env` and fill in:
 ```
 AWS_REGION=us-east-1
 AWS_PROFILE=claims-agent-dev
-BEDROCK_MODEL_ID=anthropic.claude-haiku-4-5-20251001-v1:0
-BEDROCK_EVAL_MODEL_ID=anthropic.claude-sonnet-4-20250514-v1:0
+BEDROCK_MODEL_ID=us.anthropic.claude-haiku-4-5-20251001-v1:0
+BEDROCK_EVAL_MODEL_ID=us.anthropic.claude-sonnet-4-20250514-v1:0
 BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0
 KNOWLEDGE_BASE_ID=<from 3.5>
 PINECONE_API_KEY=<from 3.4>
@@ -236,6 +274,7 @@ The Lambda code is built by Claude Code, but the function itself must exist in A
 2. **Configuration → General configuration → Edit:**
    - Memory: 512 MB (Bedrock calls don't need much memory but want low latency)
    - Timeout: 60 seconds (agent loops can take 15-30s)
+   - **Handler: leave as `index.handler` (the default).** The build script outputs `dist/index.js` to match this. If you ever change the handler name in the console, you must also update `backend/scripts/buildLambda.ts`. This is a coordination point between AWS console config and build output; the two must agree.
 3. **Configuration → Environment variables:** copy from `.env`, but omit AWS_PROFILE (Lambda uses its execution role). Required vars:
    - `AWS_REGION=us-east-1`
    - `BEDROCK_MODEL_ID`
@@ -257,23 +296,40 @@ The Lambda code is built by Claude Code, but the function itself must exist in A
 
 ---
 
-## Section 5 — Before Prompt 8 (Vercel)
+## Section 5 — Before Prompt 8 (Firebase Hosting setup)
 
-### 5.1 Vercel account and CLI
+The frontend deploys to **Firebase Hosting**, in the same `rangbull-labs-portfolio` Firebase project as the portfolio site, with a separate Hosting site `claims-agent-demo`. Two sites under one project keeps billing and project administration in one place while isolating the two apps' deploy targets.
 
-1. Create a Vercel account if you don't have one (free tier is fine).
-2. Install the CLI: `npm i -g vercel`
-3. Run `vercel login` from anywhere.
-4. The first `vercel --prod` from inside `frontend/` will prompt you to link or create a project — accept defaults.
+Public URL: `https://claims-agent.rangbull-labs.com` (custom subdomain). The default `https://claims-agent-demo.web.app` URL works as a fallback if DNS misbehaves.
 
-### 5.2 Tighten Lambda CORS
+### 5.1 One-time setup (already completed manually)
 
-After your Vercel URL is known (e.g., `https://claims-agent.vercel.app`):
+These steps are done once outside any prompt. Listed here for reproducibility:
+
+1. **Firebase Console → Hosting** in the `rangbull-labs-portfolio` project → "Add another site" → site name `claims-agent-demo`.
+2. **Custom domain:** in the new site's Hosting page → "Add custom domain" → `claims-agent.rangbull-labs.com`. Firebase generates a CNAME target.
+3. **DNS:** at the DNS provider managing `rangbull-labs.com`, add a CNAME record `claims-agent` → the Firebase-provided target. Wait for SSL provisioning (usually under an hour).
+4. **Install the Firebase CLI** locally: `npm i -g firebase-tools`, then `firebase login`.
+
+### 5.2 First deploy from the repo
+
+From the `frontend/` directory:
+
+```bash
+firebase init hosting        # select the existing rangbull-labs-portfolio project — do NOT create a new one
+firebase target:apply hosting claims-agent-demo claims-agent-demo
+pnpm build
+firebase deploy --only hosting:claims-agent-demo
+```
+
+The `target:apply` command binds the local name `claims-agent-demo` (used in `firebase.json`'s `"target"` field) to the actual Hosting site of the same name. Without this, `firebase.json`'s target reference is unresolved and the deploy fails. With it, `--only hosting:claims-agent-demo` constrains the deploy to that site so the portfolio site can never be overwritten by accident.
+
+### 5.3 Tighten Lambda CORS
 
 1. Lambda → Configuration → Environment variables → Edit
-2. Update `FRONTEND_ORIGIN=https://claims-agent.vercel.app`
+2. Set `FRONTEND_ORIGIN=https://claims-agent.rangbull-labs.com` (the custom subdomain, NOT the `.web.app` default — the custom domain is the canonical public URL)
 3. Lambda → Configuration → Function URL → Edit CORS
-4. Allow origin: change `*` to your Vercel URL (and add `http://localhost:5173` if you want local dev to work against prod Lambda)
+4. Allow origin: change `*` to `https://claims-agent.rangbull-labs.com`. Add `http://localhost:5173` as a second allowed origin so local dev can hit the prod Lambda. The dual-origin pattern is documented in CLAUDE.md "Deployment notes".
 
 ---
 
