@@ -11,7 +11,15 @@ import type { AgentTrace } from "../../src/types.js";
 interface ExpectBlock {
   httpStatus?: number;
   disposition?: "draft" | "escalated";
+  /** Strict equality on the agent's total tool-call count. Use sparingly — see `minToolCallCount`. */
   toolCallCount?: number;
+  /**
+   * Minimum tool-call count. Prefer this over `toolCallCount` for happy-path
+   * cases: the agent is allowed to make extra verification calls beyond the
+   * four-step minimum (e.g., a second lookupClaim to confirm before drafting),
+   * which is desirable behavior but defeats strict equality.
+   */
+  minToolCallCount?: number;
   minConfidence?: number;
   draftResponseNotNull?: boolean;
   draftResponseMustNotContain?: string[];
@@ -195,6 +203,14 @@ async function runCase(url: string, c: IntegrationCase): Promise<CaseResult> {
   }
   if (e.toolCallCount !== undefined && body.toolCallCount !== e.toolCallCount) {
     failures.push(`toolCallCount: expected ${e.toolCallCount}, got ${body.toolCallCount}`);
+  }
+  if (e.minToolCallCount !== undefined) {
+    const actual = body.toolCallCount;
+    if (actual === undefined || actual < e.minToolCallCount) {
+      failures.push(
+        `minToolCallCount: expected >= ${e.minToolCallCount}, got ${actual ?? "<undefined>"}`,
+      );
+    }
   }
   if (e.minConfidence !== undefined) {
     const conf = body.classification?.confidence;

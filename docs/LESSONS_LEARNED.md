@@ -232,11 +232,23 @@ The escalation guard and member-scoping middleware do exactly what they say. The
 
 **What happened:** Trace `tr-0a1bf3ba-3e4f-4472-9bd8-24491ad1b4be`: M-001 asked "Why was my last claim denied?" M-001 has zero denied claims. The four tools all returned correct grounded data (`lookupClaim` returned `count:0`). The agent then drafted "I found that you have denied claims on your account."
 
-**Root cause:** The draft step relies entirely on the system prompt to enforce grounding. Under non-adversarial input where there's a mismatch between what the user asked and what the tools found, the system prompt isn't strong enough to override the model's tendency to produce a coherent-sounding answer.
+**Root cause:** The draft step relied entirely on the system prompt to enforce grounding. Under non-adversarial input where there was a mismatch between what the user asked and what the tools found, the original system prompt wasn't strong enough to override the model's tendency to produce a coherent-sounding answer.
 
-**Fix applied:** Filed as a known-failing integration test case (`empty-result-no-denied-claims` in [backend/tests/integration/cases.json](../backend/tests/integration/cases.json)) so the gap stays visible on every test run.
+**Fix applied:** Filed as a known-failing integration test case (`empty-result-no-denied-claims` in [backend/tests/integration/cases.json](../backend/tests/integration/cases.json)) so the gap stayed visible. Then resolved by the system-prompt tightening described in the next entry.
 
-**Prevention:** Documented in [DESIGN_DECISIONS.md Section 8](DESIGN_DECISIONS.md#8-what-this-is-not) with the trace ID. The durable fix is the deterministic policy engine (Section 5, "Documented, not shipped") — a rule-based check that compares draft assertions against tool outputs.
+**Prevention:** See "Grounding-discipline system prompt eliminated fabrication-from-policy" below for the resolution mechanism. Documented architecturally in [DESIGN_DECISIONS.md Section 5](DESIGN_DECISIONS.md#5-four-safeguard-layers--and-which-two-are-shipped).
+
+### Grounding-discipline system prompt eliminated fabrication-from-policy
+
+**Category:** Agent Behavior
+
+**What happened:** After observing trace `tr-0a1bf3ba` (the M-001 hallucination described above), I tightened the agent's system prompt with a "Grounding discipline" section and a "Pre-draft checklist." The new instructions require the agent to verify that every assertion in the draft is backed by data the tools actually returned, with a specific rule that if `lookupClaim` returns `count: 0`, the draft MUST open by stating no matching claims were found.
+
+**Root cause:** The original system prompt named the four tools and their order but did not constrain the model to honor tool outputs at the draft step. After `retrievePolicy` returned generic denial-reason policy language, the model conflated "policy mentions denials" with "this member has denials" and produced draft text contradicting its own tool call.
+
+**Fix applied:** Added "GROUNDING DISCIPLINE" and "PRE-DRAFT CHECKLIST" sections to `SYSTEM_PROMPT` in [backend/src/agent.ts](../backend/src/agent.ts). The checklist makes the agent answer three questions before invoking `draftResponse`: did `lookupClaim` return any matching claims, does every cited claim ID appear in `lookupClaim`'s output, does every plan-coverage assertion correspond to a `retrievePolicy` chunk we actually retrieved. Redeployed via `bash backend/deploy.sh`. The integration case `empty-result-no-denied-claims` now passes; the `knownFailing` flag was removed from `cases.json`.
+
+**Prevention:** The system prompt now explicitly requires reflection on tool outputs before drafting. Still a model-trusted constraint, not a deterministic guard — the deferred deterministic policy engine ([DESIGN_DECISIONS.md Section 5](DESIGN_DECISIONS.md#5-four-safeguard-layers--and-which-two-are-shipped)) remains the more robust long-term fix. The system-prompt update materially reduced the gap; integration tests are now 4/4 green.
 
 ### Classifier intermittently returns `unknown` / `0`
 
@@ -303,6 +315,18 @@ Small things that bit once and cost ten minutes each.
 **Fix applied:** `fetchTrace` in the integration runner sets `ConsistentRead: true` on the `QueryCommand`. Costs ~2× the read capacity units but eliminates the race.
 
 **Prevention:** For test code that reads its own writes, default to `ConsistentRead: true`. Production code can use eventual consistency where the latency saving matters.
+
+### LLM behavior variance broke a strict tool-call-count assertion
+
+**Category:** Tooling
+
+**What happened:** After the grounding-discipline system prompt change landed, the `happy-path-denial-explanation` integration test flaked between PASS and FAIL across runs. Investigation showed the test was asserting `toolCallCount: 4` (strict equality), but the agent under the new prompt sometimes makes additional verification tool calls — exactly the architectural goal of "verify before drafting."
+
+**Root cause:** The original assertion of `toolCallCount: 4` was assertion-by-coincidence ("the agent happened to make exactly four calls in the runs we observed") rather than assertion-by-design ("the agent must complete at least the four-step pipeline"). When the system prompt change increased the agent's verification depth, the strict assertion started failing on what was now the correct behavior.
+
+**Fix applied:** Added `minToolCallCount?: number` to the test runner's `ExpectBlock` in [backend/tests/integration/runIntegrationTests.ts](../backend/tests/integration/runIntegrationTests.ts) and switched the happy-path case in [cases.json](../backend/tests/integration/cases.json) to use it. Kept `toolCallCount` as a separate option for cases that legitimately need strict equality (e.g., a future "agent must not retry" assertion).
+
+**Prevention:** Test assertions against LLM-driven systems must distinguish between architectural commitments (the floor — "at least four calls") and incidental observed behavior (a specific run's count — "exactly four"). Default to floor-style assertions unless there's a specific reason to assert exact equality. The same lesson applies to latency ceilings (use `maxDurationMs`, not equality) and tool-output structure (use phrase guards, not exact-text matches).
 
 ---
 
