@@ -106,6 +106,8 @@ The MIT program's framing — continuous evaluation as a first-class deployment 
 
 The eval suite is in version control. The eval *results* are not — they are artifacts of a specific deployment, not source. *(See [`backend/eval/cases.json`](../backend/eval/cases.json) — placeholder.)*
 
+Development uses the same operational discipline. Claude Code assists with implementation but does not run `git commit` or `git push` — every change enters the repository's history through a human review gate. The audit trail of the codebase itself is treated with the same care as the audit trail of agent decisions.
+
 ---
 
 ## 7. Autonomy posture: Supervised, with a path to Delegated

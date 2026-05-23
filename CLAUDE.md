@@ -14,6 +14,20 @@ Every architectural decision in this codebase is documented in [`docs/DESIGN_DEC
 
 The design doc names which safeguard layers are shipped vs. deferred. Do not pretend a deferred layer is built.
 
+## Git workflow conventions
+
+**Claude Code does not commit or push.** All `git add`, `git commit`, and `git push` operations are performed manually by the human after reviewing the diff. This applies to every change, including documentation updates.
+
+Why: keeps an explicit review gate before history is written, ensures commit messages reflect the human's voice, and makes the git log a reliable record of intentional decisions.
+
+When Claude Code finishes a change:
+- Report the files modified and what was done
+- Report any new dependencies added
+- Report what was verified working
+- Stop. Do not stage, commit, or push.
+
+The human reviews the diff, decides whether to commit, and writes the commit message.
+
 ## Stack — locked in
 
 - **Backend**: Node.js 20 + TypeScript on AWS Lambda
@@ -106,3 +120,17 @@ A demo is "done" when:
 5. The README links to the design doc, the architecture diagram, and a Loom walkthrough.
 
 Anything beyond these five is polish.
+
+## Git workflow conventions
+
+**Claude Code does not commit or push.** All `git add`, `git commit`, and `git push` operations are performed manually by the human after reviewing the diff. This applies to every change, including documentation updates.
+
+Why: keeps an explicit review gate before history is written, ensures commit messages reflect the human's voice, and makes the git log a reliable record of intentional decisions.
+
+When Claude Code finishes a change:
+- Report the files modified and what was done
+- Report any new dependencies added
+- Report what was verified working
+- Stop. Do not stage, commit, or push.
+
+The human reviews the diff, decides whether to commit, and writes the commit message.

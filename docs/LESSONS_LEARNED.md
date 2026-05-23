@@ -339,3 +339,15 @@ Small things that bit once and cost ten minutes each.
 **Fix applied:** Added `minToolCallCount?: number` to the test runner's `ExpectBlock` in [backend/tests/integration/runIntegrationTests.ts](../backend/tests/integration/runIntegrationTests.ts) and switched the happy-path case in [cases.json](../backend/tests/integration/cases.json) to use it. Kept `toolCallCount` as a separate option for cases that legitimately need strict equality (e.g., a future "agent must not retry" assertion).
 
 **Prevention:** Test assertions against LLM-driven systems must distinguish between architectural commitments (the floor — "at least four calls") and incidental observed behavior (a specific run's count — "exactly four"). Default to floor-style assertions unless there's a specific reason to assert exact equality. The same lesson applies to latency ceilings (use `maxDurationMs`, not equality) and tool-output structure (use phrase guards, not exact-text matches).
+
+### Claude Code shipping changes without an explicit review gate
+
+**Category:** Tooling
+
+**What happened:** Early in the project, Claude Code routinely ran `git add`, `git commit`, and `git push` at the end of each task. This worked but bypassed the human review step before history was written. Two specific risks: (a) commit messages were Claude's words rather than mine, weakening the git log as a record of intentional decisions; (b) unintended changes could slip in without a deliberate human acknowledgment.
+
+**Root cause:** The default mode of code-execution tools that have shell access is to do everything they're capable of. Without an explicit constraint in the project instructions, Claude Code treated `git push` as a natural completion step — the same way it treated `pnpm typecheck` or `firebase deploy`.
+
+**Fix applied:** Added a "Git workflow conventions" section to [CLAUDE.md](../CLAUDE.md) forbidding Claude Code from running git operations. All commits and pushes are now human-initiated after diff review. Claude Code reports what changed; the human decides what becomes history.
+
+**Prevention:** When working with code-execution tools that can mutate persistent state (git, deploys, infrastructure), make the human-in-the-loop gate explicit rather than implicit. Trust by review, not by assumption.
