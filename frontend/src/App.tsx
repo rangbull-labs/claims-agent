@@ -6,12 +6,6 @@ import { Chat, type Message } from "./pages/Chat";
 import { Traces } from "./pages/Traces";
 
 export function App() {
-  // Lifted from Chat so it survives nav between routes. MemberPicker's
-  // contract is keyed by memberId (string), so we lift the id rather
-  // than the full Member object — avoids a duplicate fetch in App and
-  // works with the existing MemberPicker without modification.
-  // Transient state (input field text, loading flag) stays inside
-  // Chat — it represents in-flight UI state that should reset on nav.
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
 
@@ -37,6 +31,7 @@ export function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
+        <Footer />
       </div>
     </BrowserRouter>
   );
@@ -77,5 +72,41 @@ function NotFound() {
     <div className="max-w-3xl mx-auto px-4 py-12 text-center text-zinc-500">
       Page not found.
     </div>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="mt-12 py-6 text-center text-xs text-zinc-500">
+      <div className="mb-1">
+        claims-agent · synthetic data only · not for production use
+      </div>
+      <div className="flex justify-center gap-1">
+        <FooterLink href="https://github.com/rangbull-labs/claims-agent">
+          GitHub
+        </FooterLink>
+        <span>·</span>
+        <FooterLink href="https://github.com/rangbull-labs/claims-agent/blob/main/docs/DESIGN_DECISIONS.md">
+          Design decisions
+        </FooterLink>
+        <span>·</span>
+        <FooterLink href="https://github.com/rangbull-labs/claims-agent/blob/main/docs/LESSONS_LEARNED.md">
+          Lessons learned
+        </FooterLink>
+      </div>
+    </footer>
+  );
+}
+
+function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hover:underline"
+    >
+      {children}
+    </a>
   );
 }

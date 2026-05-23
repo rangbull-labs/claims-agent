@@ -42,6 +42,14 @@ interface Props {
   setChatMessages: Dispatch<SetStateAction<Message[]>>;
 }
 
+const EXAMPLE_PROMPTS = [
+  "Why was my last claim denied?",
+  "What is my current deductible?",
+  "When was my last claim processed?",
+  "Tell me about claim C-0007",
+  "I want to sue you for this denial",
+];
+
 export function Chat({
   selectedMemberId,
   setSelectedMemberId,
@@ -52,6 +60,7 @@ export function Chat({
   const [loading, setLoading] = useState(false);
   const [memberMap, setMemberMap] = useState<Map<string, Member>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +109,11 @@ export function Chat({
     setChatMessages([]);
   }
 
+  function handleExampleClick(text: string) {
+    setInput(text);
+    inputRef.current?.focus();
+  }
+
   const canSend = Boolean(selectedMemberId) && input.trim().length > 0 && !loading;
   const canClear = chatMessages.length > 0 && !loading;
 
@@ -109,9 +123,13 @@ export function Chat({
 
       <div className="flex flex-col gap-3 min-h-[20rem]">
         {chatMessages.length === 0 && !loading && (
-          <div className="text-zinc-500 text-sm text-center py-8">
-            Pick a member, then ask a question to see the agent in action.
-          </div>
+          selectedMemberId ? (
+            <ExamplePrompts onSelect={handleExampleClick} />
+          ) : (
+            <div className="text-zinc-500 text-sm text-center py-8">
+              Pick a member, then ask a question to see the agent in action.
+            </div>
+          )
         )}
 
         {chatMessages.map((m, i) => {
@@ -125,7 +143,7 @@ export function Chat({
           );
         })}
 
-        {loading && <LoadingBubble />}
+        {loading && <LoadingSkeleton />}
 
         <div ref={messagesEndRef} />
       </div>
@@ -138,6 +156,7 @@ export function Chat({
         }}
       >
         <input
+          ref={inputRef}
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -165,6 +184,26 @@ export function Chat({
           {loading ? "Thinking…" : "Send"}
         </button>
       </form>
+    </div>
+  );
+}
+
+function ExamplePrompts({ onSelect }: { onSelect: (text: string) => void }) {
+  return (
+    <div className="py-6 flex flex-col items-center gap-3">
+      <span className="text-xs text-zinc-500">Try one of these:</span>
+      <div className="flex flex-wrap justify-center gap-2 max-w-lg">
+        {EXAMPLE_PROMPTS.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            onClick={() => onSelect(prompt)}
+            className="text-sm text-zinc-700 hover:text-zinc-900 border border-zinc-200 hover:border-zinc-300 rounded px-3 py-2 transition-colors"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -270,12 +309,19 @@ function AssistantBubble({ result }: { result: AgentResult }) {
   );
 }
 
-function LoadingBubble() {
+function LoadingSkeleton() {
   return (
     <div className="flex justify-start">
-      <div className="bg-white border border-zinc-200 px-4 py-3 rounded-lg flex items-center gap-2 text-zinc-600 text-sm">
-        <span className="inline-block w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-        <span>Thinking…</span>
+      <div className="max-w-[90%] w-96 bg-white border border-zinc-200 px-4 py-3 rounded-lg flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <div className="w-14 h-5 bg-zinc-200 rounded animate-pulse" />
+          <div className="w-32 h-4 bg-zinc-200 rounded animate-pulse" />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <div className="w-3/4 h-4 bg-zinc-200 rounded animate-pulse" />
+          <div className="w-full h-4 bg-zinc-200 rounded animate-pulse" />
+          <div className="w-2/3 h-4 bg-zinc-200 rounded animate-pulse" />
+        </div>
       </div>
     </div>
   );

@@ -1,10 +1,46 @@
 import { Fragment, useEffect, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { DispositionBadge } from "../components/DispositionBadge";
 import { listTraces } from "../lib/api";
 import type { AgentTrace } from "../types";
 
 const INQUIRY_TRUNCATE = 80;
+
+interface ConfidenceBucket {
+  bucket: string;
+  count: number;
+}
+
+function computeConfidenceBuckets(traces: AgentTrace[]): ConfidenceBucket[] {
+  const ranges = [
+    { bucket: "0.0–0.2", min: 0, max: 0.2 },
+    { bucket: "0.2–0.4", min: 0.2, max: 0.4 },
+    { bucket: "0.4–0.6", min: 0.4, max: 0.6 },
+    { bucket: "0.6–0.8", min: 0.6, max: 0.8 },
+    { bucket: "0.8–1.0", min: 0.8, max: 1.01 },
+  ];
+  const counts = new Array<number>(ranges.length).fill(0);
+  for (const t of traces) {
+    const conf = t.classification?.confidence;
+    if (conf === undefined || conf === null) continue;
+    for (let i = 0; i < ranges.length; i++) {
+      const r = ranges[i]!;
+      if (conf >= r.min && conf < r.max) {
+        counts[i]!++;
+        break;
+      }
+    }
+  }
+  return ranges.map((r, i) => ({ bucket: r.bucket, count: counts[i]! }));
+}
 
 export function Traces() {
   const [traces, setTraces] = useState<AgentTrace[]>([]);
@@ -51,6 +87,8 @@ export function Traces() {
           {loading ? "Refreshing…" : "Refresh"}
         </button>
       </div>
+
+      <ConfidenceChart traces={traces} />
 
       {error && (
         <div className="text-rose-700 bg-rose-50 border border-rose-200 rounded px-3 py-2 text-sm">
@@ -208,6 +246,28 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         {title}
       </div>
       {children}
+    </div>
+  );
+}
+
+function ConfidenceChart({ traces }: { traces: AgentTrace[] }) {
+  const buckets = computeConfidenceBuckets(traces);
+  const hasData = buckets.some((b) => b.count > 0);
+  if (!hasData) return null;
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded p-4">
+      <div className="text-xs font-medium uppercase tracking-wide text-zinc-500 mb-2">
+        Classifier confidence distribution
+      </div>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={buckets}>
+          <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
+          <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={30} />
+          <Tooltip />
+          <Bar dataKey="count" fill="#6366f1" radius={[2, 2, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
