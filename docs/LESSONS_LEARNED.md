@@ -262,6 +262,18 @@ The escalation guard and member-scoping middleware do exactly what they say. The
 
 **Prevention:** Track the rate in the eval suite's confidence-calibration table. If `unknown` exceeds ~5% of well-formed inputs, switch to a prompt-engineered JSON-output strategy and parse manually.
 
+### Member scoping was invisible at the UI layer
+
+**Category:** Agent Behavior
+
+**What happened:** The chat page kept message history across member changes, which was the right behavior for navigation persistence (lifted state survives route changes). But the side effect was: switching members in the same session left stale messages on screen with no visual cue that they belonged to a different member. A user could ask M-002 about their coverage, then switch to M-009, and see both conversations stacked together without disambiguation.
+
+**Root cause:** The project commits to member-scoped data isolation enforced at the data layer (closure-captured `memberId` in tool factories). The UI inherited a generic chat-app pattern where messages are obviously yours — which is fine when "yours" doesn't change. In a member-scoped agentic system where the active scope can change, the UI needs to surface scope changes explicitly.
+
+**Fix applied:** Each chat message now captures the `memberId` active at send time. The Chat page groups consecutive messages by `memberId` and inserts a small section divider with the member label (`M-009 · PPO Silver`) whenever scope changes. The architectural commitment to data isolation is now visible at the surface, not just enforced underneath.
+
+**Prevention:** When a backend architectural commitment has UI implications, design the UI affordance up front rather than retrofitting. The pattern to remember: if data is scoped, the scope should be visible. This applies to multi-tenant systems generally — auth context, tenant context, role context.
+
 ---
 
 ## 6. Operational tooling
@@ -327,15 +339,3 @@ Small things that bit once and cost ten minutes each.
 **Fix applied:** Added `minToolCallCount?: number` to the test runner's `ExpectBlock` in [backend/tests/integration/runIntegrationTests.ts](../backend/tests/integration/runIntegrationTests.ts) and switched the happy-path case in [cases.json](../backend/tests/integration/cases.json) to use it. Kept `toolCallCount` as a separate option for cases that legitimately need strict equality (e.g., a future "agent must not retry" assertion).
 
 **Prevention:** Test assertions against LLM-driven systems must distinguish between architectural commitments (the floor — "at least four calls") and incidental observed behavior (a specific run's count — "exactly four"). Default to floor-style assertions unless there's a specific reason to assert exact equality. The same lesson applies to latency ceilings (use `maxDurationMs`, not equality) and tool-output structure (use phrase guards, not exact-text matches).
-
----
-
-## Timeline
-
-A condensed view of when each cluster of issues surfaced:
-
-- **Wednesday evening:** Workspace + IAM user + DynamoDB tables + S3 bucket + Pinecone index + Bedrock KB created. Smooth — model access was the only prerequisite that took thought.
-- **Thursday morning:** Data generation + KB ingest. Pinecone-backed-KB IAM gotcha (`AssociateThirdPartyKnowledgeBase`) discovered here.
-- **Thursday midday:** Tools + member-scoping middleware. The `exactOptionalPropertyTypes` clash with Zod/LangChain surfaced; resolved by relaxing the tsconfig.
-- **Thursday afternoon:** Agent loop + Lambda deployment. Three successive issues — pnpm/esbuild cmd-shim, `"type": "module"` vs CJS handler discovery, then the Lambda handler name mismatch — before a working deployed agent.
-- **Thursday evening:** Integration tests + grounding-fidelity discovery. The known-failing case for `empty-result-no-denied-claims` was filed before the test suite was committed.

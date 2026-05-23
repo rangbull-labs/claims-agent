@@ -1,23 +1,36 @@
-import { type Dispatch, type SetStateAction, useEffect, useRef, useState } from "react";
+import {
+  type Dispatch,
+  Fragment,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { DispositionBadge } from "../components/DispositionBadge";
 import { MemberPicker } from "../components/MemberPicker";
-import { sendInquiry } from "../lib/api";
-import type { AgentResult } from "../types";
+import { listMembers, sendInquiry } from "../lib/api";
+import type { AgentResult, Member } from "../types";
 
 interface UserMessage {
   kind: "user";
   text: string;
+  memberId: string;
+  memberLabel: string;
 }
 
 interface AssistantMessage {
   kind: "assistant";
   result: AgentResult;
+  memberId: string;
+  memberLabel: string;
 }
 
 interface ErrorMessage {
   kind: "error";
   text: string;
+  memberId: string;
+  memberLabel: string;
 }
 
 export type Message = UserMessage | AssistantMessage | ErrorMessage;
@@ -35,28 +48,49 @@ export function Chat({
   chatMessages,
   setChatMessages,
 }: Props) {
-  // Transient state stays local — these represent in-flight UI that
-  // should reset when the user navigates away.
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [memberMap, setMemberMap] = useState<Map<string, Member>>(new Map());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listMembers()
+      .then((ms) => {
+        if (!cancelled) {
+          setMemberMap(new Map(ms.map((m) => [m.memberId, m])));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, loading]);
 
+  function getMemberLabel(memberId: string): string {
+    const member = memberMap.get(memberId);
+    if (!member) return memberId;
+    return `${member.memberId} · ${member.planType}`;
+  }
+
   async function handleSubmit() {
     if (!selectedMemberId || !input.trim() || loading) return;
+    const memberId = selectedMemberId;
+    const memberLabel = getMemberLabel(memberId);
     const inquiry = input.trim();
-    setChatMessages((m) => [...m, { kind: "user", text: inquiry }]);
+    setChatMessages((m) => [...m, { kind: "user", text: inquiry, memberId, memberLabel }]);
     setInput("");
     setLoading(true);
     try {
-      const result = await sendInquiry(selectedMemberId, inquiry);
-      setChatMessages((m) => [...m, { kind: "assistant", result }]);
+      const result = await sendInquiry(memberId, inquiry);
+      setChatMessages((m) => [...m, { kind: "assistant", result, memberId, memberLabel }]);
     } catch (err) {
       const text = err instanceof Error ? err.message : String(err);
-      setChatMessages((m) => [...m, { kind: "error", text }]);
+      setChatMessages((m) => [...m, { kind: "error", text, memberId, memberLabel }]);
     } finally {
       setLoading(false);
     }
@@ -80,9 +114,16 @@ export function Chat({
           </div>
         )}
 
-        {chatMessages.map((m, i) => (
-          <MessageBubble key={i} message={m} />
-        ))}
+        {chatMessages.map((m, i) => {
+          const prev = i > 0 ? chatMessages[i - 1] : undefined;
+          const showDivider = !prev || prev.memberId !== m.memberId;
+          return (
+            <Fragment key={i}>
+              {showDivider && <MemberDivider label={m.memberLabel} />}
+              <MessageBubble message={m} />
+            </Fragment>
+          );
+        })}
 
         {loading && <LoadingBubble />}
 
@@ -124,6 +165,16 @@ export function Chat({
           {loading ? "Thinking…" : "Send"}
         </button>
       </form>
+    </div>
+  );
+}
+
+function MemberDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <div className="flex-1 border-t border-zinc-200" />
+      <span className="text-xs text-zinc-500 px-2 whitespace-nowrap">{label}</span>
+      <div className="flex-1 border-t border-zinc-200" />
     </div>
   );
 }
