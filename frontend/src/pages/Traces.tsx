@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -265,7 +266,9 @@ function ConfidenceChart({ traces }: { traces: AgentTrace[] }) {
           <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
           <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={30} />
           <Tooltip />
-          <Bar dataKey="count" fill="#6366f1" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="count" fill="#6366f1" radius={[2, 2, 0, 0]}>
+            <LabelList dataKey="count" position="top" fill="#52525b" fontSize={12} />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

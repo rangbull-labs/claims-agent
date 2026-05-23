@@ -7,6 +7,8 @@ import {
   useState,
 } from "react";
 
+import ReactMarkdown from "react-markdown";
+
 import { DispositionBadge } from "../components/DispositionBadge";
 import { MemberPicker } from "../components/MemberPicker";
 import { listMembers, sendInquiry } from "../lib/api";
@@ -273,7 +275,21 @@ function AssistantBubble({ result }: { result: AgentResult }) {
             )}
           </div>
         ) : result.draftResponse ? (
-          <div className="text-sm whitespace-pre-wrap">{result.draftResponse}</div>
+          <div className="text-sm">
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                li: ({ children }) => <li className="text-zinc-900">{children}</li>,
+                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+                code: ({ children }) => <code className="bg-zinc-100 text-zinc-800 px-1 py-0.5 rounded text-sm font-mono">{children}</code>,
+              }}
+            >
+              {result.draftResponse}
+            </ReactMarkdown>
+          </div>
         ) : (
           <div className="text-sm text-zinc-500 italic">
             Agent did not produce a draft. Try rephrasing the question.
