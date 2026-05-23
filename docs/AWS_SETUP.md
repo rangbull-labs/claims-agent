@@ -298,7 +298,7 @@ The Lambda code is built by Claude Code, but the function itself must exist in A
 
 ## Section 5 — Before Prompt 8 (Firebase Hosting setup)
 
-The frontend deploys to **Firebase Hosting**, in the same `rangbull-labs-portfolio` Firebase project as the portfolio site, with a separate Hosting site `claims-agent-demo`. Two sites under one project keeps billing and project administration in one place while isolating the two apps' deploy targets.
+The frontend deploys to **Firebase Hosting** under its own `claims-agent-demo` Firebase project. This is a **separate Firebase project** from `rangbull-labs-portfolio` (the project that hosts the portfolio site itself). The original plan was a single project with two Hosting sites, but the `claims-agent-demo` site name was already reserved at a standalone project, and migrating into the portfolio project was more disruptive than just deploying where the reservation already lived. The two projects share the same Google account; billing and admin remain in the same place.
 
 Public URL: `https://claims-agent.rangbull-labs.com` (custom subdomain). The default `https://claims-agent-demo.web.app` URL works as a fallback if DNS misbehaves.
 
@@ -306,23 +306,23 @@ Public URL: `https://claims-agent.rangbull-labs.com` (custom subdomain). The def
 
 These steps are done once outside any prompt. Listed here for reproducibility:
 
-1. **Firebase Console → Hosting** in the `rangbull-labs-portfolio` project → "Add another site" → site name `claims-agent-demo`.
-2. **Custom domain:** in the new site's Hosting page → "Add custom domain" → `claims-agent.rangbull-labs.com`. Firebase generates a CNAME target.
+1. **Firebase Console → Add project** → project ID `claims-agent-demo`. The default Hosting site of the same name is created with the project.
+2. **Custom domain:** Firebase Console → Hosting → the `claims-agent-demo` site → "Add custom domain" → `claims-agent.rangbull-labs.com`. Firebase generates a CNAME target.
 3. **DNS:** at the DNS provider managing `rangbull-labs.com`, add a CNAME record `claims-agent` → the Firebase-provided target. Wait for SSL provisioning (usually under an hour).
 4. **Install the Firebase CLI** locally: `npm i -g firebase-tools`, then `firebase login`.
 
-### 5.2 First deploy from the repo
+### 5.2 Deploy from the repo
+
+The repo already contains `frontend/firebase.json` (Hosting config: `dist/` as public, SPA rewrite for `**` → `/index.html`, long-cache for hashed assets, no-cache for `/index.html`) and `frontend/.firebaserc` (binds the local target name `claims-agent-demo` to the `claims-agent-demo` site under the `claims-agent-demo` project). No interactive `firebase init` is required.
 
 From the `frontend/` directory:
 
 ```bash
-firebase init hosting        # select the existing rangbull-labs-portfolio project — do NOT create a new one
-firebase target:apply hosting claims-agent-demo claims-agent-demo
 pnpm build
 firebase deploy --only hosting:claims-agent-demo
 ```
 
-The `target:apply` command binds the local name `claims-agent-demo` (used in `firebase.json`'s `"target"` field) to the actual Hosting site of the same name. Without this, `firebase.json`'s target reference is unresolved and the deploy fails. With it, `--only hosting:claims-agent-demo` constrains the deploy to that site so the portfolio site can never be overwritten by accident.
+The `--only hosting:claims-agent-demo` target flag constrains the deploy to exactly that site. With `.firebaserc` pinning the project to `claims-agent-demo`, this command cannot accidentally touch `rangbull-labs-portfolio` or any other project.
 
 ### 5.3 Tighten Lambda CORS
 

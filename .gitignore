@@ -28,3 +28,6 @@ backend/eval/results/
 .vercel
 frontend/.env.local
 .env.local
+.firebase/
+.firebase.log
+firebase-debug.log

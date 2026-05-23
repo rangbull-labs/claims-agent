@@ -24,7 +24,7 @@ The design doc names which safeguard layers are shipped vs. deferred. Do not pre
 - **Embeddings**: Amazon Titan v2 (`amazon.titan-embed-text-v2:0`)
 - **Knowledge base**: Bedrock KB with Pinecone backend
 - **Data store**: DynamoDB (on-demand billing) — tables: `claims-agent-Members`, `claims-agent-Claims`, `claims-agent-AgentTraces`
-- **Frontend**: Vite + React 18 + TypeScript + Tailwind, deployed to Firebase Hosting (same `rangbull-labs-portfolio` Firebase project as the portfolio site, with a separate Hosting site `claims-agent-demo`). Public URL: https://claims-agent.rangbull-labs.com
+- **Frontend**: Vite + React 18 + TypeScript + Tailwind, deployed to Firebase Hosting under its own `claims-agent-demo` Firebase project (separate from `rangbull-labs-portfolio`, which hosts the portfolio site itself). Hosting site ID: `claims-agent-demo`. Public URL: https://claims-agent.rangbull-labs.com (custom domain) with https://claims-agent-demo.web.app as the default URL.
 - **Build/bundle**: esbuild for Lambda, Vite for frontend
 - **Package manager**: pnpm workspaces
 - **Region**: `us-east-1`
@@ -78,7 +78,7 @@ These are load-bearing decisions from the design doc. Read the design doc for th
 - **Lambda is deployed via `backend/deploy.sh`** — esbuild bundle → zip → `aws lambda update-function-code`. One command.
 - **The Lambda handler is configured as `index.handler`.** The build script outputs `dist/index.js` to match this convention. Do not rename one without renaming the other.
 - **Frontend is deployed to Firebase Hosting** via `firebase deploy --only hosting:claims-agent-demo` from the `frontend/` directory. No GitHub Actions in the MVP.
-- **Firebase Hosting target must be set via `firebase target:apply hosting claims-agent-demo claims-agent-demo`** in the frontend workspace before first deploy. The `firebase.json` includes the target field so deploys do not accidentally overwrite the portfolio site at the same Firebase project.
+- **Firebase Hosting target binding lives in `frontend/.firebaserc`**, which maps the local target name `claims-agent-demo` to the site of the same name under the `claims-agent-demo` Firebase project. The `firebase.json` references the target by name. `firebase deploy --only hosting:claims-agent-demo` is the only command needed; no interactive `firebase init` required.
 - **CORS is dev-vs-prod-aware.** The Lambda allows the production origin `https://claims-agent.rangbull-labs.com` and additionally `http://localhost:5173` so local Vite dev can hit the deployed Lambda. `FRONTEND_ORIGIN` carries the production origin; the localhost fallback is encoded in the handler.
 - **DynamoDB tables, IAM role, Lambda function, Bedrock KB, Pinecone index are all created manually** following `docs/AWS_SETUP.md`. The deploy script only updates Lambda code.
 - **Environment variables go in `.env`** for local dev, and as Lambda environment variables in production. `.env.example` is the source of truth for what's required.

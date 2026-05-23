@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "claims-agent-demo"
+  },
+  "targets": {
+    "claims-agent-demo": {
+      "hosting": {
+        "claims-agent-demo": [
+          "claims-agent-demo"
+        ]
+      }
+    }
+  }
+}
