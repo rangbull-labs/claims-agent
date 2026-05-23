@@ -46,7 +46,7 @@ function Nav() {
   return (
     <header className="bg-white border-b border-zinc-200">
       <nav className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-6">
-        <div className="font-semibold text-zinc-900">claims-agent</div>
+        <div className="font-semibold text-zinc-900">Claims Inquiry Agent</div>
         <div className="flex gap-4 text-sm">
           <NavItem to="/">Chat</NavItem>
           <NavItem to="/traces">Traces</NavItem>
