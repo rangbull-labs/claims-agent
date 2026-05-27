@@ -37,6 +37,37 @@ Load-bearing. Full reasoning in [DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md).
 - **Full audit trail** — every tool call persisted to DynamoDB with inputs, outputs, confidence, and scope-violation flags
 - **Scope visible at the UI layer** — chat messages tagged with the member context active at send time; member switches render explicit section dividers
 
+
+```mermaid
+flowchart TD
+    A[Inquiry received] --> B{Escalation guard<br/>Legal · Medical · Self-harm}
+    B -->|matches| Z1[Escalated trace<br/>LLM never invoked]
+    B -->|passes| C{Cross-member guard<br/>M-XXX · C-XXXX patterns}
+    C -->|matches| Z2[Cross-member refusal<br/>LLM never invoked]
+    C -->|passes| D[Member scope binding<br/>Closure capture]
+    D --> E[Agent loop · cap 6 calls]
+    E --> F1[classifyInquiry]
+    E --> F2[lookupClaim]
+    E --> F3[retrievePolicy]
+    E --> F4[draftResponse]
+    F4 --> G[Draft response + trace<br/>Persisted to DynamoDB]
+    E -.->|no draft produced| H[Iteration-cap fallback]
+    H --> G
+    
+    style B fill:#FAEEDA,stroke:#854F0B
+    style C fill:#FAEEDA,stroke:#854F0B
+    style D fill:#EEEDFE,stroke:#3C3489
+    style E fill:#E1F5EE,stroke:#085041
+    style G fill:#E6F1FB,stroke:#0C447C
+    style Z1 fill:#FCEBEB,stroke:#791F1F
+    style Z2 fill:#FCEBEB,stroke:#791F1F
+    style H fill:#EEEDFE,stroke:#3C3489
+```
+
+Two deterministic guards run before the LLM is invoked. The escalation guard catches legal language, medical-advice questions, and self-harm signals. The cross-member guard catches member-ID and claim-ID references that don't belong to the authenticated user. Both run sub-100ms.
+
+If both guards pass, member scope binds to the authenticated user via closure capture — the tools available to the LLM cannot access another member's data, by construction. The four-tool agent loop runs with a defensive cap of 6 model calls. An iteration-cap fallback handles two convergence failure modes (silent draft termination, LangGraph recursion errors), ensuring every request returns a usable response.
+
 ## Demo guide
 
 Open the [live demo](https://claims-agent.rangbull-labs.com) and try these:
