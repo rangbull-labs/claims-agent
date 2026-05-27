@@ -28,13 +28,15 @@ When Claude Code finishes a change:
 
 The human reviews the diff, decides whether to commit, and writes the commit message.
 
+The same applies to deploys. Claude Code does not run `firebase deploy`, `aws lambda update-function-code`, or any other command that pushes to a production environment. Building and verifying changes locally is in scope; production deploys are human-initiated after diff review. If a prompt asks for a deploy explicitly (e.g., "deploy after the changes"), Claude Code can run it; absent that explicit instruction, the default is to stop after local verification and let the human deploy.
+
 ## Stack — locked in
 
 - **Backend**: Node.js 20 + TypeScript on AWS Lambda
 - **API surface**: Lambda Function URL (not API Gateway), CORS enabled
 - **Agent framework**: LangChain.js v1 with `@langchain/aws` for Bedrock
 - **Primary model**: Claude Haiku 4.5 (`us.anthropic.claude-haiku-4-5-20251001-v1:0`, cross-region inference profile)
-- **Eval comparison model**: Claude Sonnet 4 (`us.anthropic.claude-sonnet-4-20250514-v1:0`, cross-region inference profile)
+- **Eval comparison model**: Claude Sonnet 4.5 (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`, cross-region inference profile)
 - **Embeddings**: Amazon Titan v2 (`amazon.titan-embed-text-v2:0`)
 - **Knowledge base**: Bedrock KB with Pinecone backend
 - **Data store**: DynamoDB (on-demand billing) — tables: `claims-agent-Members`, `claims-agent-Claims`, `claims-agent-AgentTraces`
@@ -50,7 +52,7 @@ The human reviews the diff, decides whether to commit, and writes the commit mes
 - **Do not add CDK or Terraform during the initial build.** Manual setup + deploy script only.
 - **Do not add Langfuse, Helicone, or any third-party observability platform.** CloudWatch logs + the `claims-agent-AgentTraces` DynamoDB table + a frontend `/traces` page are the observability surface.
 - **Do not add Bedrock Agents (the managed service).** We use LangChain.js for orchestration because we want to control the agent loop, the tool boundaries, and the member-scoping middleware. Bedrock Agents abstracts these away.
-- **Do not switch models without asking.** Haiku 4.5 is the primary, Sonnet 4 is the eval comparison. Don't introduce GPT, Nova, or other Bedrock models.
+- **Do not switch models without asking.** Haiku 4.5 is the primary, Sonnet 4.5 is the eval comparison. Don't introduce GPT, Nova, or other Bedrock models.
 - **Do not add Pinecone calls directly from Lambda.** Pinecone is the Bedrock KB backend; the Lambda talks to Bedrock KB, which talks to Pinecone. Do not bypass.
 - **Do not add real PHI handling code or claim that compliance is achieved.** This is a synthetic-data demo. The architecture is *shaped like* a HIPAA-compliant system; it does not *achieve* HIPAA compliance.
 - **Do not use AWS resource names without the `claims-agent-` prefix.** All resources are prefixed to keep them isolated from other projects in the same account.

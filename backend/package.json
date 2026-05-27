@@ -10,6 +10,7 @@
     "generate-data": "tsx scripts/generateData.ts",
     "seed-data": "tsx scripts/seedData.ts",
     "ingest-kb": "tsx scripts/ingestKb.ts",
+    "eval": "tsx scripts/eval.ts",
     "verify:retrievePolicy": "tsx scripts/verifyRetrievePolicy.ts",
     "test": "tsx --test src/tools/lookupClaim.test.ts src/safeguards/escalationGuard.test.ts",
     "test:integration": "tsx tests/integration/runIntegrationTests.ts"

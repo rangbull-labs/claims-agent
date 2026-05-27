@@ -48,11 +48,13 @@ Return your classification with a calibrated confidence score (0-1) and one or t
  * `"unknown"` intent with confidence 0 rather than throwing, so the
  * agent loop can continue gracefully.
  */
-export function createClassifyInquiryTool(memberId: string) {
+export function createClassifyInquiryTool(memberId: string, modelId?: string) {
   // `memberId` is bound for architectural consistency; classification is
   // member-agnostic, so the value is recorded in the trace via the
   // ambient context rather than consulted directly here.
   void memberId;
+
+  const effectiveModelId = modelId ?? BEDROCK_MODEL_ID;
 
   return tool(
     async (input): Promise<InquiryClassification> => {
@@ -61,7 +63,7 @@ export function createClassifyInquiryTool(memberId: string) {
 
       let result: InquiryClassification;
       try {
-        const model = createChatModel(BEDROCK_MODEL_ID);
+        const model = createChatModel(effectiveModelId);
         const structured = model.withStructuredOutput(classificationSchema, {
           name: "classification",
         });

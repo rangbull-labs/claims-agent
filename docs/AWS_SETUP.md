@@ -23,11 +23,11 @@ Still no AWS work needed for Prompt 2 — it sets up clients but doesn't call th
 1. AWS Console → Amazon Bedrock → Model access
 2. Confirm "Access granted" for:
    - **Claude Haiku 4.5** (`anthropic.claude-haiku-4-5-20251001-v1:0`)
-   - **Claude Sonnet 4** (`anthropic.claude-sonnet-4-20250514-v1:0`)
+   - **Claude Sonnet 4.5** (`anthropic.claude-sonnet-4-5-20250929-v1:0`)
    - **Titan Text Embeddings V2** (`amazon.titan-embed-text-v2:0`)
 3. If any are missing, click "Manage model access" → check the box → submit. Approval is usually instant for Anthropic models but can take up to a few hours.
 
-**Important: Claude Haiku 4.5 and Sonnet 4 require inference profile invocation for on-demand throughput.** In application code and environment variables, use the `us.`-prefixed inference profile IDs (`us.anthropic.claude-haiku-4-5-20251001-v1:0` and `us.anthropic.claude-sonnet-4-20250514-v1:0`) rather than the raw model IDs. The raw model IDs only work with provisioned throughput. This is a recent Bedrock change for newer Anthropic models.
+**Important: Claude Haiku 4.5 and Sonnet 4.5 require inference profile invocation for on-demand throughput.** In application code and environment variables, use the `us.`-prefixed inference profile IDs (`us.anthropic.claude-haiku-4-5-20251001-v1:0` and `us.anthropic.claude-sonnet-4-5-20250929-v1:0`) rather than the raw model IDs. The raw model IDs only work with provisioned throughput. This is a recent Bedrock change for newer Anthropic models.
 
 If Haiku 4.5 is not yet generally available in your region, fall back to Claude 3.5 Haiku (`anthropic.claude-3-5-haiku-20241022-v1:0`) and update `BEDROCK_MODEL_ID` accordingly.
 
@@ -57,14 +57,14 @@ This is the biggest setup step. Budget 60–90 minutes. Do this Wednesday evenin
       ],
       "Resource": [
         "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
-        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
+        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
         "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0",
         "arn:aws:bedrock:us-east-1:<your-account-id>:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "arn:aws:bedrock:us-east-1:<your-account-id>:inference-profile/us.anthropic.claude-sonnet-4-20250514-v1:0",
+        "arn:aws:bedrock:us-east-1:<your-account-id>:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
         "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
-        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0",
+        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
         "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
-        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-20250514-v1:0"
+        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
       ]
     },
     {
@@ -149,7 +149,7 @@ This is the biggest setup step. Budget 60–90 minutes. Do this Wednesday evenin
 }
 ```
 
-The inference profile ARNs are required because Claude Haiku 4.5 and Sonnet 4 must be invoked via inference profiles. The cross-region foundation model ARNs (us-west-2 and us-east-2) are required because inference profiles transparently load-balance requests across the US region cluster, and Bedrock validates IAM permissions for the actual underlying region at invocation time.
+The inference profile ARNs are required because Claude Haiku 4.5 and Sonnet 4.5 must be invoked via inference profiles. The cross-region foundation model ARNs (us-west-2 and us-east-2) are required because inference profiles transparently load-balance requests across the US region cluster, and Bedrock validates IAM permissions for the actual underlying region at invocation time.
 
 The CloudWatchLogsRead statement is for operator convenience (`aws logs tail`) and is NOT used by the Lambda runtime. It is over-privileging in the strictest least-privilege sense. A production hardening pass would split this into a separate `claims-agent-observer-access` policy attached to a separate operator role, rather than to the runtime user.
 
@@ -231,7 +231,7 @@ Copy `.env.example` to `.env` and fill in:
 AWS_REGION=us-east-1
 AWS_PROFILE=claims-agent-dev
 BEDROCK_MODEL_ID=us.anthropic.claude-haiku-4-5-20251001-v1:0
-BEDROCK_EVAL_MODEL_ID=us.anthropic.claude-sonnet-4-20250514-v1:0
+BEDROCK_EVAL_MODEL_ID=us.anthropic.claude-sonnet-4-5-20250929-v1:0
 BEDROCK_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0
 KNOWLEDGE_BASE_ID=<from 3.5>
 PINECONE_API_KEY=<from 3.4>

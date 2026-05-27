@@ -33,7 +33,7 @@ export interface MemberScope {
  * This is the shipped layer of the safeguard framework (Section 5 of
  * the design doc): deterministic member-scoping outside the model.
  */
-export async function resolveMemberScope(rawMemberId: string): Promise<MemberScope> {
+export async function resolveMemberScope(rawMemberId: string, modelId?: string): Promise<MemberScope> {
   if (typeof rawMemberId !== "string" || rawMemberId.length === 0) {
     throw new Error("rawMemberId must be a non-empty string");
   }
@@ -49,7 +49,7 @@ export async function resolveMemberScope(rawMemberId: string): Promise<MemberSco
     memberId,
     member,
     tools: {
-      classifyInquiry: createClassifyInquiryTool(memberId),
+      classifyInquiry: createClassifyInquiryTool(memberId, modelId),
       lookupClaim: createLookupClaimTool(memberId),
       retrievePolicy: createRetrievePolicyTool(memberId),
       draftResponse: createDraftResponseTool(memberId),

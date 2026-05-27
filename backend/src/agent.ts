@@ -4,9 +4,10 @@ import { HumanMessage } from "@langchain/core/messages";
 import { createAgent, modelCallLimitMiddleware } from "langchain";
 
 import { createChatModel } from "./aws/bedrock.js";
-import { putTrace } from "./aws/dynamo.js";
+import { lookupClaimOwner, putTrace } from "./aws/dynamo.js";
 import { BEDROCK_MODEL_ID } from "./config.js";
 import { resolveMemberScope } from "./middleware/memberScope.js";
+import { detectCrossMemberReference } from "./safeguards/crossMemberGuard.js";
 import { shouldEscalate } from "./safeguards/escalationGuard.js";
 import { getCurrentTrace, withTraceContext } from "./tracing/traceContext.js";
 import type { AgentTrace, InquiryClassification } from "./types.js";
@@ -25,6 +26,7 @@ export interface AgentResult {
   /** Tool names in invocation order — included so the frontend can render the sequence without an extra trace fetch. */
   toolNames: string[];
   durationMs: number;
+  model: string;
   escalationReason?: string;
 }
 
@@ -69,30 +71,35 @@ PRE-DRAFT CHECKLIST (walk through before calling draftResponse):
  * 1. Pre-model escalation guard (`shouldEscalate`). On match, persists
  *    an `escalated` trace and returns without invoking any model. The
  *    LLM never sees the inquiry.
- * 2. Member resolution (`resolveMemberScope`) — fetches the member
+ * 2. Cross-member reference guard (`detectCrossMemberReference`).
+ *    Pattern-matches member IDs and claim IDs in the inquiry text,
+ *    verifies ownership via DynamoDB, and short-circuits with a
+ *    `cross_member_refusal` draft if a mismatch is found.
+ * 3. Member resolution (`resolveMemberScope`) — fetches the member
  *    from DynamoDB and constructs the four tools with `memberId`
  *    captured in each closure. A request for an unknown member throws,
  *    which the Lambda handler surfaces as a 500.
- * 3. LangChain v1 `createAgent` (LangGraph-backed ReAct), wired to
+ * 4. LangChain v1 `createAgent` (LangGraph-backed ReAct), wired to
  *    Claude Haiku 4.5 with `modelCallLimitMiddleware({ runLimit: 6 })`
  *    as a defensive cap against runaway loops.
- * 4. The agent is invoked inside `withTraceContext` so every tool
+ * 5. The agent is invoked inside `withTraceContext` so every tool
  *    call accumulates on the trace context for persistence.
- * 5. After completion (success or not), the full trace is written to
- *    `claims-agent-AgentTraces` with `disposition: "draft"`.
- *
- * If the agent never calls `draftResponse` (gave up, hit
- * `MAX_MODEL_CALLS`, encountered an error mid-loop), `draftResponse`
- * is returned as `null` but the trace is still persisted so the
- * failure is auditable.
+ * 6. If the agent loop completed without calling `draftResponse`
+ *    (hit `MAX_MODEL_CALLS`, gave up, encountered an error mid-loop),
+ *    a fallback response is substituted with `iteration_cap_exceeded`
+ *    intent so the user always gets an actionable reply.
+ * 7. After completion (success or fallback), the full trace is written
+ *    to `claims-agent-AgentTraces` with `disposition: "draft"`.
  */
 export async function runAgent(
   memberId: string,
   inquiry: string,
+  modelId?: string,
 ): Promise<AgentResult> {
   const startedAt = Date.now();
   const traceId = `tr-${randomUUID()}`;
   const timestamp = new Date(startedAt).toISOString();
+  const effectiveModelId = modelId ?? BEDROCK_MODEL_ID;
 
   // 1. Deterministic pre-model escalation
   const escalation = shouldEscalate(inquiry);
@@ -116,7 +123,7 @@ export async function runAgent(
       toolCalls: [],
       draftResponse: null,
       disposition: "escalated",
-      model: BEDROCK_MODEL_ID,
+      model: effectiveModelId,
       escalationReason: reason,
     };
     await putTrace(trace);
@@ -128,15 +135,63 @@ export async function runAgent(
       toolCallCount: 0,
       toolNames: [],
       durationMs: Date.now() - startedAt,
+      model: effectiveModelId,
       escalationReason: reason,
     };
   }
 
-  // 2. Resolve member scope (binds memberId into the four tool closures)
-  const scope = await resolveMemberScope(memberId);
+  // 2. Deterministic cross-member reference guard
+  const crossMemberCheck = await detectCrossMemberReference(
+    memberId,
+    inquiry,
+    lookupClaimOwner,
+  );
+  if (crossMemberCheck.isViolation) {
+    const { reason } = crossMemberCheck;
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        message: "Cross-member reference detected by pre-model guard",
+        traceId,
+        memberId,
+        reason,
+      }),
+    );
+    const draftResponse = `I can only help with questions about your own account. ${reason} Please contact Member Services at 1-555-SYN-PLAN for help with another member's account.`;
+    const classification = {
+      intent: "cross_member_refusal" as const,
+      confidence: 1.0,
+      reasoning: reason,
+    };
+    const trace: AgentTrace = {
+      traceId,
+      timestamp,
+      memberId,
+      userInquiry: inquiry,
+      classification,
+      toolCalls: [],
+      draftResponse,
+      disposition: "draft",
+      model: effectiveModelId,
+    };
+    await putTrace(trace);
+    return {
+      traceId,
+      disposition: "draft",
+      classification,
+      draftResponse,
+      toolCallCount: 0,
+      toolNames: ["crossMemberGuard"],
+      durationMs: Date.now() - startedAt,
+      model: effectiveModelId,
+    };
+  }
 
-  // 3. Build the tool-calling agent (LangChain v1)
-  const model = createChatModel(BEDROCK_MODEL_ID);
+  // 3. Resolve member scope (binds memberId into the four tool closures)
+  const scope = await resolveMemberScope(memberId, modelId);
+
+  // 4. Build the tool-calling agent (LangChain v1)
+  const model = createChatModel(effectiveModelId);
   const tools = [
     scope.tools.classifyInquiry,
     scope.tools.lookupClaim,
@@ -151,9 +206,22 @@ export async function runAgent(
     middleware: [modelCallLimitMiddleware({ runLimit: MAX_MODEL_CALLS })],
   });
 
-  // 4. Invoke inside the trace context
+  // 5. Invoke inside the trace context
   const execution = await withTraceContext(traceId, scope.memberId, async () => {
-    await agent.invoke({ messages: [new HumanMessage(inquiry)] });
+    try {
+      await agent.invoke({ messages: [new HumanMessage(inquiry)] });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.warn(
+        JSON.stringify({
+          level: "warn",
+          message: "Agent invocation threw; will produce fallback draft",
+          traceId,
+          memberId,
+          error: errorMessage,
+        }),
+      );
+    }
     const ctx = getCurrentTrace();
     if (!ctx) {
       throw new Error("Trace context missing after agent invocation");
@@ -174,27 +242,58 @@ export async function runAgent(
     };
   });
 
-  // 5. Persist the trace
+  // 6. Fallback if the agent loop completed without producing a draft
+  const toolCallCount = execution.toolCalls.length;
+  const toolNames = execution.toolCalls.map((c) => c.toolName);
+  let { draftResponse } = execution;
+  let { classification } = execution;
+
+  if (!draftResponse) {
+    draftResponse =
+      "I started looking into your question but wasn't able to complete the search. " +
+      "Please try rephrasing your question — for example, mentioning a specific claim ID " +
+      "or the date of service — or contact Member Services for help.";
+    classification = {
+      intent: "iteration_cap_exceeded",
+      confidence: 1.0,
+      reasoning: "Agent loop completed without calling draftResponse",
+    };
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        message: "Agent loop terminated without producing a draft; fallback response sent",
+        traceId,
+        memberId,
+        inquiry: inquiry.slice(0, 200),
+        toolCallCount,
+        toolNames,
+        model: effectiveModelId,
+      }),
+    );
+  }
+
+  // 7. Persist the trace
   const trace: AgentTrace = {
     traceId,
     timestamp,
     memberId: scope.memberId,
     userInquiry: inquiry,
-    classification: execution.classification,
+    classification,
     toolCalls: execution.toolCalls,
-    draftResponse: execution.draftResponse,
+    draftResponse,
     disposition: "draft",
-    model: BEDROCK_MODEL_ID,
+    model: effectiveModelId,
   };
   await putTrace(trace);
 
   return {
     traceId,
     disposition: "draft",
-    draftResponse: execution.draftResponse,
-    classification: execution.classification,
-    toolCallCount: execution.toolCalls.length,
-    toolNames: execution.toolCalls.map((c) => c.toolName),
+    draftResponse,
+    classification,
+    toolCallCount,
+    toolNames,
     durationMs: Date.now() - startedAt,
+    model: effectiveModelId,
   };
 }

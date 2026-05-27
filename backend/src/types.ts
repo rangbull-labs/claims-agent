@@ -34,6 +34,8 @@ export type InquiryIntent =
   | "eob_question"
   | "coverage_lookup"
   | "claim_status"
+  | "cross_member_refusal"
+  | "iteration_cap_exceeded"
   | "unknown";
 
 export interface InquiryClassification {

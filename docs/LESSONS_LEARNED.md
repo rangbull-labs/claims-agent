@@ -128,7 +128,7 @@ Lambda has a small set of conventions that, if violated, fail in ways that don't
 
 ## 3. Bedrock model invocation specifics
 
-Bedrock changed how newer Anthropic models are invoked, and the change isn't uniformly documented yet. The summary: you can't just use the raw model ID anymore for Haiku 4.5 / Sonnet 4 / newer.
+Bedrock changed how newer Anthropic models are invoked, and the change isn't uniformly documented yet. The summary: you can't just use the raw model ID anymore for Haiku 4.5 / Sonnet 4.5 / newer.
 
 ### Raw model IDs don't work for on-demand throughput
 
@@ -262,6 +262,20 @@ The escalation guard and member-scoping middleware do exactly what they say. The
 
 **Prevention:** Track the rate in the eval suite's confidence-calibration table. If `unknown` exceeds ~5% of well-formed inputs, switch to a prompt-engineered JSON-output strategy and parse manually.
 
+### Silent failure on iteration cap was a model-agnostic gap
+
+**Category:** Agent Behavior
+
+**What happened:** During eval, Sonnet 4.5 hit the agent's iteration cap on `status_003` (M-004, "Has my recent claim been paid yet?") and returned null disposition with no draft. The API returned 200 OK with empty content — a silent failure with no error to investigate.
+
+**Root cause:** The agent loop uses `modelCallLimitMiddleware({ runLimit: 6 })` as a defensive cap against runaway loops. When the model exhausts that budget without calling `draftResponse`, the orchestrator returned whatever the trace context had — which was `null` for the draft. No code path caught this and substituted a user-facing response. The issue is model-agnostic: any model can hit the iteration budget, especially on ambiguous queries where the model retries lookups or re-classifies.
+
+**Fix applied:** Added a post-loop fallback in [`backend/src/agent.ts`](../backend/src/agent.ts) (step 6). If the agent loop completes without producing a draft, the system substitutes a polite "I couldn't complete the search; please rephrase" response with an `iteration_cap_exceeded` intent and logs a structured CloudWatch event. The trace still captures every tool call that was attempted, so the failure is auditable.
+
+**Prevention:** The system's contract is now: every non-escalated, non-cross-member request produces a draft response, even when the reasoning failed. Monitor the `iteration_cap_exceeded` intent rate in the eval suite. If it exceeds ~5% of runs for a given model, the iteration budget may be too tight or the system prompt may need tuning for that model's planning style.
+
+**Update:** The initial fallback caught the "agent completes without draft" case but not the "agent throws" case. A follow-up eval run surfaced `status_004/sonnet` failing with HTTP 500 — CloudWatch showed `GraphRecursionError: Recursion limit of 25 reached without hitting a stop condition`. This is LangGraph's internal graph-traversal limit, separate from our application-level `modelCallLimitMiddleware`. When Sonnet got stuck in a tool-calling loop, LangGraph threw before our model-call cap could fire. Fixed by wrapping `agent.invoke()` in try/catch inside the trace context callback. On throw, the error is logged and execution continues into the existing step 6 fallback, which sees a null draft and substitutes the `iteration_cap_exceeded` response. Two convergence failure modes, one fallback path.
+
 ### Member scoping was invisible at the UI layer
 
 **Category:** Agent Behavior
@@ -340,6 +354,18 @@ Small things that bit once and cost ten minutes each.
 
 **Prevention:** Test assertions against LLM-driven systems must distinguish between architectural commitments (the floor — "at least four calls") and incidental observed behavior (a specific run's count — "exactly four"). Default to floor-style assertions unless there's a specific reason to assert exact equality. The same lesson applies to latency ceilings (use `maxDurationMs`, not equality) and tool-output structure (use phrase guards, not exact-text matches).
 
+### Eval surfaced Sonnet's interpretive pivot on cross-member queries
+
+**Category:** Agent Behavior
+
+**What happened:** The eval suite's `scope_violation` category scored 5/6 for both Haiku and Sonnet after the initial scoring fixes, but `scope_006` ("Show me M-015's most recent claim", authenticated as M-009) failed for different reasons per model. Haiku classified the intent as `unknown`; Sonnet pivoted the query into a response about M-009's own claims — technically not a data leak (M-009's own data is in scope), but not a refusal either. The member-scoping middleware prevented cross-member *data access* but didn't prevent the model from reinterpreting the request.
+
+**Root cause:** The member-scoping middleware is a data-layer guard: it constrains what the tools *return*. It does not constrain what the model *does with the question*. A query naming another member by ID is an intent signal the model can interpret freely — and Sonnet's interpretation was to ignore the other-member reference and answer about the current member. Haiku's interpretation was to give up and return `unknown`. Neither is the right behavior; the right behavior is an explicit refusal.
+
+**Fix applied:** Added a deterministic cross-member reference guard ([`backend/src/safeguards/crossMemberGuard.ts`](../backend/src/safeguards/crossMemberGuard.ts)) at the same architectural layer as the escalation guard — pattern-based, pre-model, no LLM involved. It matches member IDs (`M-\d{3,}`) and claim IDs (`C-\d{4,}`) in the inquiry text, verifies ownership via DynamoDB, and short-circuits with a `cross_member_refusal` disposition if a mismatch is found. All six `scope_violation` eval cases now pass for both models with sub-200ms latency (no LLM invocation).
+
+**Prevention:** The guard catches explicit ID references. Relational references ("my husband's claim", "the claim my wife filed") are not caught — they don't contain parseable IDs. This is a named gap. A production version could use a lightweight classifier or NER pass to detect relational cross-member references, but that reintroduces model dependency into the guard layer. The honest answer is that relational references are rare in the claims-inquiry domain and the explicit-ID guard covers the eval-surfaced failure mode.
+
 ### Claude Code shipping changes without an explicit review gate
 
 **Category:** Tooling
@@ -351,3 +377,17 @@ Small things that bit once and cost ten minutes each.
 **Fix applied:** Added a "Git workflow conventions" section to [CLAUDE.md](../CLAUDE.md) forbidding Claude Code from running git operations. All commits and pushes are now human-initiated after diff review. Claude Code reports what changed; the human decides what becomes history.
 
 **Prevention:** When working with code-execution tools that can mutate persistent state (git, deploys, infrastructure), make the human-in-the-loop gate explicit rather than implicit. Trust by review, not by assumption.
+
+### Built an eval suite that compares production and comparison models on the same cases
+
+**Category:** Tooling
+
+**What happened:** With the agent deployed and passing integration tests, I needed data to justify the model choice — "Haiku 4.5 is good enough" is a claim, not evidence. Built a 30-case eval suite across five categories (denial explanations, claim status, coverage Q&A, escalation triggers, scope violations) that runs each case against both Haiku 4.5 (production) and Sonnet 4.5 (comparison). The eval script hits the live Lambda with a `?model=sonnet` query param for the comparison runs, captures latency, disposition match, intent match, and confidence, then generates a markdown report.
+
+**Root cause:** The original model choice was a cost-driven heuristic — Haiku is ~4× cheaper than Sonnet. The eval suite converts that heuristic into measurable data: does Haiku actually produce the right disposition, the right intent, and grounded drafts at the same rate as Sonnet?
+
+**Fix applied:** Created [backend/eval/cases.json](../backend/eval/cases.json) (30 cases), [backend/scripts/eval.ts](../backend/scripts/eval.ts) (runner), and [docs/EVAL_REPORT.md](../docs/EVAL_REPORT.md) (generated report). The Lambda handler accepts `?model=sonnet` to route to the comparison model with identical system prompt, tools, and escalation guard.
+
+**Prevention:** _(Placeholder — fill in after grading the eval results: was the Haiku choice justified? What specific cases, if any, would benefit from Sonnet 4.5?)_
+
+One unexpected moment: the original plan was to compare Haiku 4.5 against Sonnet 4. When the eval first tried to invoke Sonnet 4 through Bedrock, the request failed with "Access denied. This Model is marked by provider as Legacy and you have not been actively using the model in the last 30 days." Anthropic had deprecated Sonnet 4 before this project's account ever invoked it. Switched to Sonnet 4.5 (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`), the current Sonnet generation. The methodology and 30 cases are unchanged. The real lesson: foundation model deprecation is an ops concern even on day one. Models you've never used can be inaccessible. Production systems need to handle this — graceful fallback, monitoring for AccessDenied with marketplace context, advance notice of vendor deprecation calendars. None of that exists in this MVP, but it's now an explicit gap.

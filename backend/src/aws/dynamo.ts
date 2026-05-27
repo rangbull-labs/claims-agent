@@ -90,6 +90,16 @@ export async function findClaimByIdUnscoped(claimId: string): Promise<Claim | nu
 }
 
 /**
+ * Returns the `memberId` that owns a given claim, or `null` if the claim does
+ * not exist. Intentionally cross-member — used by the cross-member guard to
+ * verify ownership before the agent loop runs.
+ */
+export async function lookupClaimOwner(claimId: string): Promise<string | null> {
+  const claim = await findClaimByIdUnscoped(claimId);
+  return claim?.memberId ?? null;
+}
+
+/**
  * Lists every claim belonging to a single member. Uses a `Query` against the
  * `memberId` partition key — no cross-member access is possible.
  */

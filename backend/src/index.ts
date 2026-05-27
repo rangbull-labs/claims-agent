@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { runAgent } from "./agent.js";
 import { listAllMembers, listRecentTraces } from "./aws/dynamo.js";
+import { BEDROCK_EVAL_MODEL_ID } from "./config.js";
 
 const bodySchema = z.object({
   memberId: z.string().min(1, "memberId is required"),
@@ -11,6 +12,7 @@ const bodySchema = z.object({
 interface LambdaFunctionURLEvent {
   body?: string;
   rawPath?: string;
+  queryStringParameters?: Record<string, string | undefined>;
   isBase64Encoded?: boolean;
   requestContext?: {
     http?: {
@@ -37,7 +39,7 @@ function jsonResponse(statusCode: number, payload: unknown): LambdaResult {
  * Lambda Function URL handler. Routes by `event.requestContext.http.method`
  * and `event.rawPath`:
  *
- *   POST   /        → run the agent (body: { memberId, inquiry })
+ *   POST   /        → run the agent (body: { memberId, inquiry }, ?model=sonnet for eval)
  *   GET    /members → list every member (for the chat dropdown)
  *   GET    /traces  → list the 50 most recent agent traces (newest first)
  *
@@ -117,6 +119,8 @@ async function handlePostAgent(event: LambdaFunctionURLEvent): Promise<LambdaRes
     });
   }
 
-  const result = await runAgent(validated.data.memberId, validated.data.inquiry);
+  const modelParam = event.queryStringParameters?.model;
+  const modelId = modelParam === "sonnet" ? BEDROCK_EVAL_MODEL_ID : undefined;
+  const result = await runAgent(validated.data.memberId, validated.data.inquiry, modelId);
   return jsonResponse(200, result);
 }

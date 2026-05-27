@@ -18,7 +18,7 @@ The four-tool loop follows the framework from MIT Sloan's *Implementing Agentic 
 
 - **Runtime:** TypeScript · Node.js 20 · AWS Lambda (Function URL)
 - **Agent:** LangChain.js v1 (`createAgent` + LangGraph + `modelCallLimitMiddleware`)
-- **Model:** Claude Haiku 4.5 via Bedrock inference profiles (Sonnet 4 for eval comparison)
+- **Model:** Claude Haiku 4.5 via Bedrock inference profiles (Sonnet 4.5 for eval comparison)
 - **Embeddings:** Amazon Titan v2
 - **Knowledge base:** Bedrock KB with Pinecone vector store
 - **State:** DynamoDB (members, claims, agent traces)

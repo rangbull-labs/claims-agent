@@ -15,7 +15,7 @@ Feed these to Claude Code in order, one at a time. Wait for each to finish and v
 
 ---
 
-## Day 0 (Wednesday evening) — Repo skeleton
+## Day 0 — Repo skeleton
 
 ### ☐ Prompt 1 — Workspace and toolchain
 
@@ -109,7 +109,7 @@ Done when:
 
 ---
 
-## Day 1 (Thursday) — Agent loop end-to-end
+## Day 1 — Agent loop end-to-end
 
 ### ☐ Prompt 3 — Synthetic data generation
 
@@ -307,7 +307,7 @@ Done when:
 
 ---
 
-## Day 2 (Friday) — Trace API + first frontend
+## Day 2 — Trace API + first frontend
 
 ### ☐ Prompt 7 — Traces endpoint + minimum viable frontend
 
@@ -384,7 +384,7 @@ Done when:
 
 ---
 
-## Day 3 (Saturday) — Deploy frontend + polish
+## Day 3 — Deploy frontend + polish
 
 ### ☐ Prompt 8 — Firebase Hosting deploy + frontend polish
 
@@ -429,11 +429,11 @@ Done when:
 
 ---
 
-## Day 4 (Monday) — Eval + architecture artifacts
+## Day 4 — Eval + architecture artifacts
 
 ### ☐ Prompt 9 — Eval suite + architecture diagram
 
-**AWS prerequisites:** Lambda + Bedrock Sonnet 4 access.
+**AWS prerequisites:** Lambda + Bedrock Sonnet 4.5 access.
 
 ```
 Read CLAUDE.md and docs/DESIGN_DECISIONS.md Section 6 (AgentOps).
@@ -482,7 +482,7 @@ Done when:
 
 ---
 
-## Day 5 (Tuesday) — Portfolio integration + Loom
+## Day 5 — Portfolio integration + Loom
 
 ### ☐ Prompt 10 — Portfolio site entry + README + architecture diagram component
 
