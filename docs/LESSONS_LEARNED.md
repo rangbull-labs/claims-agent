@@ -1,6 +1,6 @@
 # Lessons Learned
 
-Friction points encountered during the Prompt 1–6 build sequence, captured as a topical reference. Each entry stands on its own — search for the symptom, read the fix, move on. Where the fix has been folded into a canonical doc (`AWS_SETUP.md`, `CLAUDE.md`, `DESIGN_DECISIONS.md`), the entry points to that location rather than restating it.
+Friction points encountered during the build, captured as a topical reference. Each entry stands on its own — search for the symptom, read the fix, move on. Where the fix has been folded into a canonical doc (`AWS_SETUP.md`, `CLAUDE.md`, `DESIGN_DECISIONS.md`), the entry points to that location rather than restating it.
 
 This isn't a tutorial and isn't exhaustive. It covers issues that required diagnosis, not the obvious stuff.
 
@@ -362,9 +362,21 @@ Small things that bit once and cost ten minutes each.
 
 **Root cause:** The member-scoping middleware is a data-layer guard: it constrains what the tools *return*. It does not constrain what the model *does with the question*. A query naming another member by ID is an intent signal the model can interpret freely — and Sonnet's interpretation was to ignore the other-member reference and answer about the current member. Haiku's interpretation was to give up and return `unknown`. Neither is the right behavior; the right behavior is an explicit refusal.
 
-**Fix applied:** Added a deterministic cross-member reference guard ([`backend/src/safeguards/crossMemberGuard.ts`](../backend/src/safeguards/crossMemberGuard.ts)) at the same architectural layer as the escalation guard — pattern-based, pre-model, no LLM involved. It matches member IDs (`M-\d{3,}`) and claim IDs (`C-\d{4,}`) in the inquiry text, verifies ownership via DynamoDB, and short-circuits with a `cross_member_refusal` disposition if a mismatch is found. All six `scope_violation` eval cases now pass for both models with sub-200ms latency (no LLM invocation).
+**Fix applied:** Added a deterministic cross-member reference guard ([`backend/src/safeguards/crossMemberGuard.ts`](../backend/src/safeguards/crossMemberGuard.ts)) at the same architectural layer as the escalation guard — pattern-based, pre-model, no LLM involved. It matches member IDs (`M-\d{3,}`) and claim IDs (`C-\d{4,}`) in the inquiry text, verifies ownership via DynamoDB, and short-circuits with a `cross_member_refusal` disposition if a mismatch is found. All six `scope_violation` eval cases now pass for both models at sub-100ms latency (avg 60ms Haiku, 63ms Sonnet — no LLM invocation).
 
 **Prevention:** The guard catches explicit ID references. Relational references ("my husband's claim", "the claim my wife filed") are not caught — they don't contain parseable IDs. This is a named gap. A production version could use a lightweight classifier or NER pass to detect relational cross-member references, but that reintroduces model dependency into the guard layer. The honest answer is that relational references are rare in the claims-inquiry domain and the explicit-ID guard covers the eval-surfaced failure mode.
+
+### Test design separates classifier behavior from architectural invariants
+
+**Category:** Tooling
+
+**What happened:** The first eval pass scored 0/6 on `scope_violation` cases for both models. Manual review showed the agent behaved correctly in all 12 runs (both Haiku and Sonnet returned "no claim found" with zero data leakage). The failure was in the test design, not the agent.
+
+**Root cause:** The eval's pass condition combined `dispositionMatch && intentMatch`, where `intentMatch` for `expectedIntent: null` cases required `disposition === "escalated"`. `scope_violation` cases had `expectedIntent: null` (signaling "we don't care about classification") AND `expectedDisposition: "draft"` (signaling "the agent should draft a refusal, not escalate"). The logic conflated two distinct concerns: classifier behavior (what intent did the LLM assign?) and the architectural invariant (did the response leak data about another member's claim?).
+
+**Fix applied:** Added an `expectedBehavior` field to eval cases. For `scope_violation`, set `expectedBehavior: "no_data_leaked"`. Added a `dataIsolationMatch` check in [backend/scripts/eval.ts](../backend/scripts/eval.ts) that searches the draft response for phrases indicating "no claim found." Cases now require all three checks: `dispositionMatch`, `intentMatch`, and (where applicable) `dataIsolationMatch`. The phrase list was broadened iteratively as eval runs surfaced legitimate refusal phrasings not in the original list ("did not find," "was not able to find," "unable to find").
+
+**Prevention:** When an architectural commitment matters (data isolation, no PII leakage, RAG grounding), the test should measure it directly with its own assertion. Behavioral signals like "agent drafted vs escalated" are necessary but not sufficient. The `expectedBehavior` schema is extensible — future invariants can add fields like `no_pii_leaked`, `cites_specific_policy`, `no_jailbreak`. A more rigorous version would compare the response against the actual off-scope claim's fields rather than checking for refusal phrases; the phrase-based check works for the current MVP but would not catch a response like "I couldn't find that claim, but here's what I found about it: ..." that satisfies the phrase check while still leaking data.
 
 ### Claude Code shipping changes without an explicit review gate
 
@@ -388,6 +400,8 @@ Small things that bit once and cost ten minutes each.
 
 **Fix applied:** Created [backend/eval/cases.json](../backend/eval/cases.json) (30 cases), [backend/scripts/eval.ts](../backend/scripts/eval.ts) (runner), and [docs/EVAL_REPORT.md](../docs/EVAL_REPORT.md) (generated report). The Lambda handler accepts `?model=sonnet` to route to the comparison model with identical system prompt, tools, and escalation guard.
 
-**Prevention:** _(Placeholder — fill in after grading the eval results: was the Haiku choice justified? What specific cases, if any, would benefit from Sonnet 4.5?)_
+**Prevention:** The eval validated Haiku 4.5 as the production choice. Across 5 categories, Haiku matched Sonnet 4.5 on accuracy (100% disposition match, 96.7% intent match) at 1/4 the per-inquiry cost and 2.5× the speed. The two Sonnet-specific failures were a borderline classification (`status_005`, "Is my claim for the physical therapy visit covered?" — classified as `coverage_lookup` vs `claim_status`, defensible either way) and a convergence failure (`status_004` hitting `GraphRecursionError`, now caught by the iteration-cap fallback). Neither argues for Sonnet at 4× the cost.
+
+The eval methodology — same Lambda, same system prompt, same tools, only model swapped — gave clean comparability. If a production system added new categories or new architectural features, re-running the eval against both models would surface whether the model choice still holds. The eval is a regression suite for model-choice decisions, not just a one-time benchmark.
 
 One unexpected moment: the original plan was to compare Haiku 4.5 against Sonnet 4. When the eval first tried to invoke Sonnet 4 through Bedrock, the request failed with "Access denied. This Model is marked by provider as Legacy and you have not been actively using the model in the last 30 days." Anthropic had deprecated Sonnet 4 before this project's account ever invoked it. Switched to Sonnet 4.5 (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`), the current Sonnet generation. The methodology and 30 cases are unchanged. The real lesson: foundation model deprecation is an ops concern even on day one. Models you've never used can be inaccessible. Production systems need to handle this — graceful fallback, monitoring for AccessDenied with marketplace context, advance notice of vendor deprecation calendars. None of that exists in this MVP, but it's now an explicit gap.
